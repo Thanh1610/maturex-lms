@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
@@ -14,25 +15,44 @@ import {
 } from "@/components/ui";
 import { api } from "@/lib/api-client";
 import { dateLabel } from "@/lib/formatters";
+import type { AppState, LiveUser } from "@/types";
 import { IntegrationStatus } from "../../admin/components/service-integrations";
 
-function NotificationPreferences({ user, mutate, busy }) {
-  const [enabled, setEnabled] = useState(true),
-    [saved, setSaved] = useState(null),
-    [error, setError] = useState(""),
-    [loading, setLoading] = useState(true);
+function NotificationPreferences({
+  user,
+  mutate,
+  busy,
+}: {
+  user: LiveUser;
+  mutate: (
+    path: string,
+    method?: string,
+    body?: unknown,
+    message?: string,
+  ) => Promise<unknown>;
+  busy: boolean;
+}) {
+  const [enabled, setEnabled] = useState(true);
+  const [saved, setSaved] = useState<boolean | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const loadSequence = useRef(0);
+
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
     setLoading(true);
     setError("");
     try {
-      const result = await api("/account/preferences");
+      const result = await api<{
+        preferences: { email_notifications: boolean };
+      }>("/account/preferences");
       if (sequence !== loadSequence.current) return;
       setEnabled(result.preferences.email_notifications);
       setSaved(result.preferences.email_notifications);
-    } catch (error: any) {
-      if (sequence === loadSequence.current) setError(error.message);
+    } catch (err: unknown) {
+      if (sequence === loadSequence.current) {
+        setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      }
     } finally {
       if (sequence === loadSequence.current) setLoading(false);
     }
@@ -45,13 +65,13 @@ function NotificationPreferences({ user, mutate, busy }) {
   }, [load]);
   async function submit(event) {
     event.preventDefault();
-    const result = await mutate(
+    const result = (await mutate(
       "/account/preferences",
       "PUT",
       { email_notifications: enabled },
       "Đã lưu tùy chọn thông báo.",
-    );
-    if (result) {
+    )) as { preferences: { email_notifications: boolean } } | null;
+    if (result?.preferences) {
       setEnabled(result.preferences.email_notifications);
       setSaved(result.preferences.email_notifications);
     }
@@ -114,17 +134,27 @@ const auditActions = {
   "password.change": "Đổi mật khẩu",
   "path.assign": "Giao lộ trình học",
 };
+interface AuditEntry {
+  id: string;
+  actor_name?: string;
+  action: string;
+  target_id?: string;
+  created_at: string;
+}
+
 function AuditLog() {
-  const [entries, setEntries] = useState<any>(null),
-    [error, setError] = useState(""),
-    [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      setEntries((await api("/audit")).entries);
-    } catch (error: any) {
-      setError(error.message);
+      const data = await api<{ entries: AuditEntry[] }>("/audit");
+      setEntries(data.entries);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
@@ -199,7 +229,8 @@ function AuditLog() {
                     {entry.actor_name || "Hệ thống"}
                   </TableCell>
                   <TableCell className="p-[12px_14px] text-[11px] text-[#555064]">
-                    {auditActions[entry.action] || entry.action}
+                    {(auditActions as Record<string, string>)[entry.action] ||
+                      entry.action}
                   </TableCell>
                   <TableCell className="p-[12px_14px] text-[11px] text-[#757185] break-words">
                     {entry.target_id || "—"}
@@ -213,11 +244,26 @@ function AuditLog() {
     </section>
   );
 }
-export function Settings({ state, mutate, busy }) {
-  const [_message, _setMessage] = useState(""),
-    [error, setError] = useState(""),
-    [saving, setSaving] = useState(false);
-  async function profile(e) {
+
+export function Settings({
+  state,
+  mutate,
+  busy,
+}: {
+  state: AppState & { user: LiveUser };
+  mutate: (
+    path: string,
+    method?: string,
+    body?: unknown,
+    message?: string,
+  ) => Promise<unknown>;
+  busy: boolean;
+}) {
+  const [_message, _setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function profile(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     await mutate(
       "/account/profile",
@@ -226,7 +272,8 @@ export function Settings({ state, mutate, busy }) {
       "Đã lưu hồ sơ.",
     );
   }
-  async function password(e: any) {
+
+  async function password(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
     setError("");
@@ -234,8 +281,8 @@ export function Settings({ state, mutate, busy }) {
     try {
       await api("/account/password", "POST", values);
       location.assign("/");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
       setSaving(false);
     }
@@ -358,25 +405,28 @@ export function PasswordRecovery({
   token?: string;
   onDone?: () => void;
 }) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
-  async function submit(e: any) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
       const body = Object.fromEntries(new FormData(e.currentTarget));
-      const result = await api(
+      const result = await api<{ message?: string }>(
         token ? "/password/reset" : "/password/forgot",
         "POST",
         token ? { token, password: body.password } : body,
       );
       setMessage(
-        token ? "Đã đặt lại mật khẩu. Bạn có thể đăng nhập." : result.message,
+        token
+          ? "Đã đặt lại mật khẩu. Bạn có thể đăng nhập."
+          : result.message || "",
       );
-    } catch (e: any) {
-      setError(e.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }

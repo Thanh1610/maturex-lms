@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 export function PageHead({
   eyebrow,
@@ -7,13 +7,12 @@ export function PageHead({
   children,
   className = "",
   ...props
-}: {
+}: HTMLAttributes<HTMLDivElement> & {
   eyebrow?: string;
   title: string;
   description?: string;
   children?: ReactNode;
   className?: string;
-  [key: string]: any;
 }) {
   return (
     <div
@@ -49,13 +48,12 @@ export function SectionHead({
   onClick,
   className = "",
   ...props
-}: {
+}: HTMLAttributes<HTMLDivElement> & {
   title: string;
   description?: string;
   action?: string;
   onClick?: () => void;
   className?: string;
-  [key: string]: any;
 }) {
   return (
     <div

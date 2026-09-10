@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import {
   Badge,
@@ -12,37 +13,51 @@ import {
   TableRow,
 } from "@/components/ui";
 import { api, roleLabels } from "@/lib/api-client";
+import type { LiveUser } from "@/types";
+
+export interface ManagedUser extends LiveUser {
+  team?: string;
+  job?: string;
+  manager_id?: string | null;
+  active?: boolean;
+}
 
 export function UserManagement({
   mutate,
   busy,
 }: {
-  mutate: any;
+  mutate: (
+    path: string,
+    method?: string,
+    body?: unknown,
+    message?: string,
+  ) => Promise<unknown>;
   busy: boolean;
 }) {
-  const [users, setUsers] = useState<any[] | null>(null);
+  const [users, setUsers] = useState<ManagedUser[] | null>(null);
   const [error, setError] = useState("");
   const [show, setShow] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [resetUrl, setResetUrl] = useState("");
 
   async function reset(id: string) {
     setError("");
-    const result = await mutate(
+    const result = (await mutate(
       `/users/${id}/reset`,
       "POST",
       {},
       "Đã tạo liên kết đặt lại mật khẩu, có hiệu lực 20 phút.",
-    );
+    )) as { token: string } | undefined;
     if (result) setResetUrl(`${location.origin}/#reset/${result.token}`);
   }
 
   async function load() {
     try {
-      setUsers((await api("/users")).users);
+      const data = await api<{ users: ManagedUser[] }>("/users");
+      setUsers(data.users);
       setError("");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     }
   }
 
@@ -50,7 +65,7 @@ export function UserManagement({
     load();
   }, []);
 
-  async function submit(event: any) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const result = await mutate(
@@ -294,13 +309,18 @@ function UserEditor({
   busy,
   onDone,
 }: {
-  target: any;
-  users: any;
-  mutate: any;
+  target: ManagedUser;
+  users: ManagedUser[];
+  mutate: (
+    path: string,
+    method?: string,
+    body?: unknown,
+    message?: string,
+  ) => Promise<unknown>;
   busy: boolean;
   onDone: () => Promise<void>;
 }) {
-  async function submit(e: any) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const values = Object.fromEntries(new FormData(e.currentTarget));
     const result = await mutate(
@@ -369,12 +389,12 @@ function UserEditor({
             <option value="">Chưa phân công</option>
             {users
               ?.filter(
-                (u: any) =>
+                (u: ManagedUser) =>
                   u.id !== target.id &&
                   u.active &&
-                  ["manager", "admin"].includes(u.role),
+                  (u.role === "manager" || u.role === "admin"),
               )
-              .map((u: any) => (
+              .map((u: ManagedUser) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>

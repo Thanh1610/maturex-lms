@@ -1,6 +1,22 @@
+import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button, Icon } from "@/components/ui";
 import { api } from "@/lib/api-client";
+import type { Course, Lesson } from "@/types";
+
+interface FileItem {
+  id: string;
+  name: string;
+  size: number;
+  mime: string;
+  course_id: string;
+  lesson_id?: string | null;
+  assignment_id?: string | null;
+  assignment_version?: number | null;
+  cohort_assignment_id?: string | null;
+  cohort_assignment_version?: number | null;
+  created_at: string;
+}
 
 export function FilePanel({
   courseId,
@@ -17,15 +33,16 @@ export function FilePanel({
   editable?: boolean;
   version?: number;
 }) {
-  const [files, setFiles] = useState<any[]>([]),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   const loadSequence = useRef(0);
+
   async function load() {
     const sequence = ++loadSequence.current;
     try {
-      const result = await api("/files");
+      const result = await api<{ files: FileItem[] }>("/files");
       if (sequence !== loadSequence.current) return;
       setFiles(
         result.files.filter((f) =>
@@ -39,20 +56,25 @@ export function FilePanel({
                 (!lessonId || !f.lesson_id || f.lesson_id === lessonId),
         ),
       );
-    } catch (e: any) {
-      if (sequence === loadSequence.current) setError(e.message);
+    } catch (e: unknown) {
+      if (sequence === loadSequence.current) {
+        setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
+      }
     }
   }
+
   useEffect(() => {
     load();
     return () => {
       loadSequence.current++;
     };
-  }, [load]);
-  async function upload(event: any) {
+  }, [courseId, lessonId, assignmentId, cohortAssignmentId]);
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget,
-      file = form.elements.file.files[0];
+    const form = event.currentTarget;
+    const input = form.elements.namedItem("file") as HTMLInputElement | null;
+    const file = input?.files?.[0];
     if (!file) return;
     setBusy(true);
     setError("");
@@ -84,20 +106,21 @@ export function FilePanel({
       form.reset();
       setNotice("Đã tải tệp lên.");
       await load();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }
   }
-  async function remove(id: any) {
+
+  async function remove(id: string) {
     setBusy(true);
     setError("");
     try {
       await api(`/files/${id}`, "DELETE", {});
       await load();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }
@@ -208,65 +231,85 @@ export function FilePanel({
     </section>
   );
 }
+interface QuizItem {
+  lesson_id: string;
+  question: string;
+  options: string[];
+  correct_index?: number;
+  explanation: string;
+}
+
+interface LearningData {
+  notes: Array<{ lesson_id: string; body: string }>;
+  quizzes: QuizItem[];
+}
+
 export function LessonTools({
   course,
   lesson,
   state,
 }: {
-  course: any;
-  lesson: any;
-  state?: any;
+  course: { id: string } & Partial<Course>;
+  lesson: Lesson & { id: string };
+  state?: unknown;
 }) {
-  const [data, setData] = useState<any>(null),
-    [note, setNote] = useState(""),
-    [answer, setAnswer] = useState(""),
-    [result, setResult] = useState<any>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [saved, setSaved] = useState(false);
+  const [data, setData] = useState<LearningData | null>(null);
+  const [note, setNote] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [result, setResult] = useState<{ passed: boolean; explanation: string } | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
   useEffect(() => {
     let current = true;
-    api("/learning")
+    api<LearningData>("/learning")
       .then((d) => {
         if (!current) return;
         setData(d);
-        const savedNote = d.notes.find((n: any) => n.lesson_id === lesson.id);
+        const savedNote = d.notes.find((n) => n.lesson_id === lesson.id);
         if (savedNote) {
           setNote(savedNote.body);
           setSaved(true);
         }
       })
-      .catch((e: any) => current && setError(e.message));
+      .catch((e: unknown) => {
+        if (current) setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
+      });
     return () => {
       current = false;
     };
   }, [lesson.id]);
-  const quiz = data?.quizzes.find((q: any) => q.lesson_id === lesson.id);
-  async function saveNote(e: any) {
+
+  const quiz = data?.quizzes.find((q) => q.lesson_id === lesson.id);
+
+  async function saveNote(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
       await api(`/learning/notes/${lesson.id}`, "PUT", { text: note });
       setSaved(true);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }
   }
-  async function submit(e: any) {
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      setResult(
-        await api(`/learning/quizzes/${lesson.id}/attempt`, "POST", {
-          answerIndex: Number(answer),
-        }),
+      const res = await api<{ passed: boolean; explanation: string }>(
+        `/learning/quizzes/${lesson.id}/attempt`,
+        "POST",
+        { answerIndex: Number(answer) },
       );
-    } catch (e: any) {
-      setError(e.message);
+      setResult(res);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }
@@ -379,34 +422,38 @@ export function ContentTools({
   course,
   onClose,
 }: {
-  course: any;
+  course: Course & { lessons: Array<Lesson & { id: string }> };
   onClose: () => void;
 }) {
-  const [selected, setSelected] = useState(course.lessons[0].id),
-    [question, setQuestion] = useState(""),
-    [options, setOptions] = useState(""),
-    [correct, setCorrect] = useState("0"),
-    [explanation, setExplanation] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
+  const [selected, setSelected] = useState(course.lessons[0]?.id || "");
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState("");
+  const [correct, setCorrect] = useState("0");
+  const [explanation, setExplanation] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
   useEffect(() => {
     let current = true;
-    api("/learning")
-      .then((d: any) => {
+    api<LearningData>("/learning")
+      .then((d) => {
         if (!current) return;
-        const quiz = d.quizzes.find((q: any) => q.lesson_id === selected);
+        const quiz = d.quizzes.find((q) => q.lesson_id === selected);
         setQuestion(quiz?.question || "");
         setOptions(quiz?.options.join("\n") || "");
         setCorrect(String(quiz?.correct_index ?? 0));
         setExplanation(quiz?.explanation || "");
       })
-      .catch((e: any) => current && setError(e.message));
+      .catch((e: unknown) => {
+        if (current) setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
+      });
     return () => {
       current = false;
     };
   }, [selected]);
-  async function save(e: any) {
+
+  async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError("");
@@ -416,14 +463,14 @@ export function ContentTools({
         question,
         options: options
           .split("\n")
-          .map((x: any) => x.trim())
+          .map((x) => x.trim())
           .filter(Boolean),
         correctIndex: Number(correct),
         explanation,
       });
       setNotice("Đã lưu câu hỏi ôn tập.");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }

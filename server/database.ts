@@ -1,17 +1,24 @@
-import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
-export function openDatabase(path) {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+export type AppDatabase = DatabaseSync;
+
+export function openDatabase(path: string): AppDatabase {
+  if (path !== ":memory:") {
+    mkdirSync(dirname(path), { recursive: true });
+  }
   const db = new DatabaseSync(path, { timeout: 5000 });
   db.exec("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;");
-  const version = db.prepare("PRAGMA user_version").get().user_version;
+  const versionRow = db.prepare("PRAGMA user_version").get() as {
+    user_version: number;
+  };
+  const version = versionRow.user_version;
   if (version > 2) {
     db.close();
     throw new Error("Database schema is newer than this application.");
   }
-  if (version === 0)
+  if (version === 0) {
     transaction(db, () => {
       db.exec(`
       CREATE TABLE users (
@@ -64,7 +71,8 @@ export function openDatabase(path) {
       PRAGMA user_version=1;
     `);
     });
-  if (version < 2)
+  }
+  if (version < 2) {
     transaction(db, () => {
       db.exec(`
       ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1));
@@ -77,9 +85,11 @@ export function openDatabase(path) {
       PRAGMA user_version=2;
     `);
     });
+  }
   return db;
 }
-export function transaction(db, work) {
+
+export function transaction<T>(db: AppDatabase, work: () => T): T {
   db.exec("BEGIN IMMEDIATE");
   try {
     const result = work();

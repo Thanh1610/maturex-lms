@@ -1,25 +1,49 @@
 import {
+  createHash,
   randomBytes,
   randomUUID,
-  createHash,
   scrypt,
   timingSafeEqual,
 } from "node:crypto";
-import { promisify } from "node:util";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { AppDatabase } from "./database";
 
-const derive = promisify(scrypt);
 const scryptOptions = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 const lifetime = 8 * 60 * 60;
+
+function deriveKey(password: string, salt: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, 64, scryptOptions, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey as Buffer);
+    });
+  });
+}
+
 export class HttpError extends Error {
-  constructor(status, message) {
+  status: number;
+  constructor(status: number, message: string) {
     super(message);
     this.status = status;
   }
 }
-export function check(condition, status, message) {
-  if (!condition) throw new HttpError(status, message);
+
+export function check(
+  condition: unknown,
+  status: number,
+  message: string,
+): asserts condition {
+  if (!condition) {
+    throw new HttpError(status, message);
+  }
 }
-export function textField(value, name, max = 5000, min = 1) {
+
+export function textField(
+  value: unknown,
+  name: string,
+  max = 5000,
+  min = 1,
+): string {
   check(
     typeof value === "string" &&
       value.trim().length >= min &&
@@ -29,7 +53,35 @@ export function textField(value, name, max = 5000, min = 1) {
   );
   return value.trim();
 }
-export function publicUser(user) {
+
+export interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active?: number;
+  team?: string;
+  job?: string;
+  manager_id?: string | null;
+  management?: number;
+  password_hash?: string;
+  created_at?: string;
+}
+
+export interface PublicUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  team: string;
+  job: string;
+  manager_id: string | null;
+}
+
+export type AuthUser = PublicUser;
+
+export function publicUser(user: UserRow): PublicUser {
   return {
     id: user.id,
     name: user.name,
@@ -41,7 +93,8 @@ export function publicUser(user) {
     manager_id: user.manager_id || null,
   };
 }
-export async function hashPassword(password) {
+
+export async function hashPassword(password: string): Promise<string> {
   check(
     typeof password === "string" &&
       password.length >= 12 &&
@@ -50,37 +103,56 @@ export async function hashPassword(password) {
     "Mật khẩu cần từ 12 đến 128 ký tự.",
   );
   const salt = randomBytes(16).toString("hex");
-  const key = await derive(password, salt, 64, scryptOptions);
+  const key = await deriveKey(password, salt);
   return `${salt}:${key.toString("hex")}`;
 }
-export async function prepareUser(body) {
+
+export async function prepareUser(body: Record<string, unknown>): Promise<{
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  management: number;
+  password_hash: string;
+}> {
   const name = textField(body.name, "Họ tên", 100);
   const email = textField(body.email, "Email", 254).toLowerCase();
   check(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 400, "Email không hợp lệ.");
+  const role = String(body.role || "");
   check(
-    ["admin", "instructor", "learner", "manager"].includes(body.role),
+    ["admin", "instructor", "learner", "manager"].includes(role),
     400,
     "Vai trò không hợp lệ.",
   );
+  const password = String(body.password || "");
   check(
-    typeof body.password === "string" &&
-      body.password.length >= 12 &&
-      body.password.length <= 128,
+    password.length >= 12 && password.length <= 128,
     400,
     "Mật khẩu cần từ 12 đến 128 ký tự.",
   );
   const salt = randomBytes(16).toString("hex");
-  const key = await derive(body.password, salt, 64, scryptOptions);
+  const key = await deriveKey(password, salt);
   return {
     id: randomUUID(),
     name,
     email,
-    role: body.role === "manager" ? "learner" : body.role,
-    management: body.role === "manager" ? 1 : 0,
+    role: role === "manager" ? "learner" : role,
+    management: role === "manager" ? 1 : 0,
     password_hash: `${salt}:${key.toString("hex")}`,
   };
 }
-export function insertUser(db, user) {
+
+export function insertUser(
+  db: AppDatabase,
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    management: number;
+    password_hash: string;
+  },
+): PublicUser {
   check(
     !db.prepare("SELECT id FROM users WHERE email=?").get(user.email),
     409,
@@ -99,17 +171,23 @@ export function insertUser(db, user) {
   );
   return publicUser(user);
 }
-export async function verifyPassword(password, stored) {
+
+export async function verifyPassword(
+  password: unknown,
+  stored?: string,
+): Promise<boolean> {
   if (typeof password !== "string" || password.length > 128) return false;
-  // Also derive for unknown accounts, keeping the login error and work consistent.
   const [salt, hash] = (stored || `${"0".repeat(32)}:${"0".repeat(128)}`).split(
     ":",
   );
-  const key = await derive(password, salt, 64, scryptOptions);
+  const key = await deriveKey(password, salt);
   return timingSafeEqual(key, Buffer.from(hash, "hex")) && Boolean(stored);
 }
-const tokenHash = (value) => createHash("sha256").update(value).digest("hex");
-function token(req) {
+
+const tokenHash = (value: string): string =>
+  createHash("sha256").update(value).digest("hex");
+
+function token(req: IncomingMessage): string {
   return (
     (req.headers.cookie || "")
       .split(";")
@@ -118,10 +196,18 @@ function token(req) {
       ?.slice(11) || ""
   );
 }
-function cookie(value, secure, age) {
+
+function cookie(value: string, secure: boolean, age: number): string {
   return `mx_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secure ? "; Secure" : ""}`;
 }
-export function startSession(db, req, res, userId, secure) {
+
+export function startSession(
+  db: AppDatabase,
+  req: IncomingMessage,
+  res: ServerResponse,
+  userId: string,
+  secure: boolean,
+): void {
   db.prepare("DELETE FROM sessions WHERE token_hash=? OR expires_at<=?").run(
     tokenHash(token(req)),
     Date.now(),
@@ -134,18 +220,25 @@ export function startSession(db, req, res, userId, secure) {
   );
   res.setHeader("Set-Cookie", cookie(raw, secure, lifetime));
 }
-export function endSession(db, req, res, secure) {
+
+export function endSession(
+  db: AppDatabase,
+  req: IncomingMessage,
+  res: ServerResponse,
+  secure: boolean,
+): void {
   db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
     tokenHash(token(req)),
   );
   res.setHeader("Set-Cookie", cookie("", secure, 0));
 }
-export function authenticate(db, req) {
+
+export function authenticate(db: AppDatabase, req: IncomingMessage): PublicUser {
   const user = db
     .prepare(
       "SELECT u.* FROM users u JOIN sessions s ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.active=1",
     )
-    .get(tokenHash(token(req)), Date.now());
+    .get(tokenHash(token(req)), Date.now()) as unknown as UserRow | undefined;
   check(user, 401, "Vui lòng đăng nhập để tiếp tục.");
   return publicUser(user);
 }

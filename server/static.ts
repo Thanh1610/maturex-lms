@@ -1,7 +1,9 @@
-import { resolve, sep, extname } from "node:path";
-import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-const mime = {
+import { stat } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { extname, resolve, sep } from "node:path";
+
+const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -10,11 +12,18 @@ const mime = {
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
 };
-export async function serveStatic(req, res, directory) {
-  if (!["GET", "HEAD"].includes(req.method)) return false;
-  let pathname;
+
+export async function serveStatic(
+  req: IncomingMessage,
+  res: ServerResponse,
+  directory: string,
+): Promise<boolean> {
+  if (!["GET", "HEAD"].includes(req.method || "")) return false;
+  let pathname: string;
   try {
-    pathname = decodeURIComponent(new URL(req.url, "http://local").pathname);
+    pathname = decodeURIComponent(
+      new URL(req.url || "/", "http://local").pathname,
+    );
   } catch {
     return false;
   }
@@ -24,8 +33,8 @@ export async function serveStatic(req, res, directory) {
     pathname.includes("\\")
   )
     return false;
-  const root = resolve(directory),
-    file = resolve(root, "." + (pathname === "/" ? "/index.html" : pathname));
+  const root = resolve(directory);
+  const file = resolve(root, `.${pathname === "/" ? "/index.html" : pathname}`);
   if (!file.startsWith(root + sep)) return false;
   const info = await stat(file).catch(() => null);
   if (!info?.isFile()) return false;
@@ -45,8 +54,9 @@ export async function serveStatic(req, res, directory) {
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
   );
   res.writeHead(200);
-  if (req.method === "HEAD") res.end();
-  else {
+  if (req.method === "HEAD") {
+    res.end();
+  } else {
     const stream = createReadStream(file);
     stream.on("error", () => res.destroy());
     res.on("close", () => stream.destroy());

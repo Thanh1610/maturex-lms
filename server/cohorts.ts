@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { check, textField } from "./auth.js";
-import { transaction } from "./database.js";
-import { notify } from "./social.js";
+import type { DatabaseSync } from "node:sqlite";
+import { check, textField } from "./auth";
+import type { AuthUser, PublicUser } from "./auth";
+import { transaction } from "./database";
+import { notify } from "./social";
 
 const now = () => new Date().toISOString();
-const result = (data = { ok: true }, status = 200) => ({ status, data });
+const result = (data: unknown = { ok: true }, status = 200) => ({ status, data });
 
-export function initCohorts(db) {
+export function initCohorts(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS cohorts (
       id TEXT PRIMARY KEY, course_id TEXT NOT NULL REFERENCES courses(id), title TEXT NOT NULL,
@@ -55,12 +57,25 @@ export function initCohorts(db) {
   `);
 }
 
-function account(db, user) {
-  return user?.id
-    ? db.prepare("SELECT * FROM users WHERE id=? AND active=1").get(user.id)
-    : null;
+interface UserAccount {
+  id: string;
+  name: string;
+  role: string;
+  management: number;
+  team: string;
+  active: number;
 }
-function leadAccess(db, user, courseId) {
+
+function account(db: DatabaseSync, user: AuthUser | null | undefined): UserAccount | null {
+  if (!user?.id) return null;
+  return (
+    (db
+      .prepare("SELECT * FROM users WHERE id=? AND active=1")
+      .get(user.id) as unknown as UserAccount | undefined) ?? null
+  );
+}
+
+function leadAccess(db: DatabaseSync, user: AuthUser | null | undefined, courseId: string): boolean {
   const current = account(db, user);
   return Boolean(
     current &&
@@ -71,7 +86,8 @@ function leadAccess(db, user, courseId) {
           .get(courseId, current.id))),
   );
 }
-export function cohortTeachAccess(db, user, cohortId) {
+
+export function cohortTeachAccess(db: DatabaseSync, user: AuthUser | null | undefined, cohortId: string): boolean {
   const current = account(db, user);
   return Boolean(
     current &&
@@ -84,22 +100,34 @@ export function cohortTeachAccess(db, user, cohortId) {
           .get(cohortId, current.id, cohortId, current.id))),
   );
 }
-function membership(db, user, id) {
-  return db
-    .prepare("SELECT * FROM cohort_members WHERE cohort_id=? AND user_id=?")
-    .get(id, user.id);
+
+interface CohortMemberRecord {
+  cohort_id: string;
+  user_id: string;
+  status: string;
+  version: number;
 }
-function managedLearners(db, user, id) {
+
+function membership(db: DatabaseSync, user: AuthUser, id: string): CohortMemberRecord | null {
+  return (
+    (db
+      .prepare("SELECT * FROM cohort_members WHERE cohort_id=? AND user_id=?")
+      .get(id, user.id) as unknown as CohortMemberRecord | undefined) ?? null
+  );
+}
+
+function managedLearners(db: DatabaseSync, user: AuthUser, id: string): string[] {
   const current = account(db, user);
   if (!current?.management) return [];
-  return db
+  const rows = db
     .prepare(
       `SELECT u.id FROM users u JOIN cohort_members m ON m.user_id=u.id WHERE m.cohort_id=? AND u.role='learner' AND u.management=0 AND u.id<>? AND (u.manager_id=? OR (?<>'' AND u.team=?))`,
     )
-    .all(id, current.id, current.id, current.team.trim(), current.team)
-    .map((row) => row.id);
+    .all(id, current.id, current.id, current.team.trim(), current.team) as unknown as Array<{ id: string }>;
+  return rows.map((row) => row.id);
 }
-export function cohortReadAccess(db, user, id) {
+
+export function cohortReadAccess(db: DatabaseSync, user: AuthUser, id: string): boolean {
   return Boolean(
     account(db, user) &&
     (cohortTeachAccess(db, user, id) ||
@@ -107,37 +135,60 @@ export function cohortReadAccess(db, user, id) {
       managedLearners(db, user, id).length),
   );
 }
-function getCohort(db, id) {
+
+export interface CohortRecord {
+  id: string;
+  course_id: string;
+  title: string;
+  code: string;
+  start_date: string;
+  end_date: string;
+  capacity: number;
+  status: string;
+  version: number;
+  created_by: string;
+  created_at: string;
+  course_title: string;
+  exercise: string;
+  skill: string;
+  owner_id: string;
+}
+
+function getCohort(db: DatabaseSync, id: string): CohortRecord {
   const c = db
     .prepare(
       "SELECT h.*,c.title AS course_title,c.exercise,c.skill,c.owner_id FROM cohorts h JOIN courses c ON c.id=h.course_id WHERE h.id=?",
     )
-    .get(id);
+    .get(id) as unknown as CohortRecord | undefined;
   check(c, 404, "Không tìm thấy lớp học.");
   return c;
 }
-function instructors(db, id) {
+
+function instructors(db: DatabaseSync, id: string): Array<{ id: string; name: string }> {
   return db
     .prepare(
       "SELECT u.id,u.name FROM users u JOIN cohort_instructors i ON i.user_id=u.id WHERE i.cohort_id=? AND u.active=1 AND u.role='instructor' ORDER BY u.name",
     )
-    .all(id);
+    .all(id) as unknown as Array<{ id: string; name: string }>;
 }
-function progress(db, id, userId) {
+
+function progress(db: DatabaseSync, id: string, userId: string) {
   const c = getCohort(db, id);
-  const total = db
-    .prepare("SELECT COUNT(*) n FROM lessons WHERE course_id=?")
-    .get(c.course_id).n;
-  const completed = db
-    .prepare(
-      "SELECT COUNT(*) n FROM cohort_progress WHERE cohort_id=? AND user_id=?",
-    )
-    .get(id, userId).n;
+  const total = (
+    db.prepare("SELECT COUNT(*) n FROM lessons WHERE course_id=?").get(c.course_id) as unknown as { n: number }
+  ).n;
+  const completed = (
+    db
+      .prepare(
+        "SELECT COUNT(*) n FROM cohort_progress WHERE cohort_id=? AND user_id=?",
+      )
+      .get(id, userId) as unknown as { n: number }
+  ).n;
   const assignment = db
     .prepare(
       "SELECT status FROM cohort_assignments WHERE cohort_id=? AND user_id=?",
     )
-    .get(id, userId);
+    .get(id, userId) as unknown as { status: string } | undefined;
   return {
     completed_lessons: completed,
     total_lessons: total,
@@ -146,15 +197,17 @@ function progress(db, id, userId) {
       total > 0 && completed === total && assignment?.status === "approved",
   };
 }
-function summary(db, user, c) {
-  const member = membership(db, user, c.id),
-    canManage = cohortTeachAccess(db, user, c.id);
+
+function summary(db: DatabaseSync, user: AuthUser, c: CohortRecord) {
+  const member = membership(db, user, c.id);
+  const canManage = cohortTeachAccess(db, user, c.id);
   const managed = managedLearners(db, user, c.id);
   const nextSession = db
     .prepare(
       "SELECT id,title,starts_at FROM cohort_sessions WHERE cohort_id=? AND status='scheduled' AND starts_at>? ORDER BY starts_at LIMIT 1",
     )
     .get(c.id, now());
+
   return {
     ...c,
     instructors: instructors(db, c.id),
@@ -164,11 +217,13 @@ function summary(db, user, c) {
     membership_status: member?.status || null,
     member_count:
       canManage || member || leadAccess(db, user, c.course_id)
-        ? db
-            .prepare(
-              "SELECT COUNT(*) n FROM cohort_members WHERE cohort_id=? AND status='active'",
-            )
-            .get(c.id).n
+        ? (
+            db
+              .prepare(
+                "SELECT COUNT(*) n FROM cohort_members WHERE cohort_id=? AND status='active'",
+              )
+              .get(c.id) as unknown as { n: number }
+          ).n
         : managed.length,
     ...(member ? { progress: progress(db, c.id, user.id) } : {}),
     ...((canManage || member?.status === "active") && nextSession
@@ -176,24 +231,29 @@ function summary(db, user, c) {
       : {}),
   };
 }
-function candidates(db, user, cohort) {
+
+function candidates(db: DatabaseSync, user: AuthUser, cohort?: CohortRecord) {
+  const userAcc = account(db, user);
   const canCreate =
-    account(db, user)?.role === "admin" ||
-    (db
-      .prepare("SELECT 1 FROM courses WHERE owner_id=? AND status='published'")
-      .get(user.id) &&
-      account(db, user)?.role === "instructor");
+    userAcc?.role === "admin" ||
+    Boolean(
+      db
+        .prepare("SELECT 1 FROM courses WHERE owner_id=? AND status='published'")
+        .get(user.id) &&
+        userAcc?.role === "instructor",
+    );
   const manage = cohort
     ? cohortTeachAccess(db, user, cohort.id)
     : canCreate ||
       Boolean(
         db
           .prepare("SELECT 1 FROM cohort_instructors WHERE user_id=?")
-          .get(user.id) && account(db, user)?.role === "instructor",
+          .get(user.id) && userAcc?.role === "instructor",
       );
   const staffAccess = cohort
     ? leadAccess(db, user, cohort.course_id)
     : canCreate;
+
   return {
     staff: staffAccess
       ? db
@@ -214,62 +274,82 @@ function candidates(db, user, cohort) {
           .prepare(
             "SELECT id,title FROM courses WHERE status='published' AND (?='admin' OR owner_id=?) ORDER BY title",
           )
-          .all(account(db, user).role, user.id)
+          .all(userAcc?.role, user.id)
       : [],
   };
 }
-function memberRows(db, user, c) {
-  const canManage = cohortTeachAccess(db, user, c.id),
-    allowed = managedLearners(db, user, c.id);
-  return db
+
+interface MemberRowRecord {
+  cohort_id: string;
+  user_id: string;
+  status: string;
+  version: number;
+  name: string;
+  email: string;
+}
+
+function memberRows(db: DatabaseSync, user: AuthUser, c: CohortRecord) {
+  const canManage = cohortTeachAccess(db, user, c.id);
+  const allowed = managedLearners(db, user, c.id);
+  const allMembers = db
     .prepare(
       "SELECT m.*,u.name,u.email FROM cohort_members m JOIN users u ON u.id=m.user_id WHERE m.cohort_id=? ORDER BY u.name",
     )
-    .all(c.id)
+    .all(c.id) as unknown as MemberRowRecord[];
+
+  return allMembers
     .filter(
       (m) => canManage || m.user_id === user.id || allowed.includes(m.user_id),
     )
     .map((m) => ({ ...m, ...progress(db, c.id, m.user_id) }));
 }
-function assignmentDto(db, a) {
+
+function assignmentDto(db: DatabaseSync, a: Record<string, unknown>): Record<string, unknown> & { user_id: string; history: unknown[] } {
   return {
     ...a,
+    user_id: a.user_id as string,
     history: db
       .prepare(
         "SELECT h.*,u.name AS actor_name FROM cohort_assignment_history h JOIN users u ON u.id=h.actor_id WHERE assignment_id=? ORDER BY version",
       )
-      .all(a.id),
+      .all(a.id as string),
   };
 }
-function detail(db, user, c) {
-  const teach = cohortTeachAccess(db, user, c.id),
-    member = membership(db, user, c.id),
-    learning = teach || member?.status === "active";
+
+function detail(db: DatabaseSync, user: AuthUser, c: CohortRecord) {
+  const teach = cohortTeachAccess(db, user, c.id);
+  const member = membership(db, user, c.id);
+  const learning = teach || member?.status === "active";
   const rows =
     teach || member
-      ? db
-          .prepare(
-            `SELECT a.*,u.name AS learner_name,c.title AS course_title,c.exercise,c.skill FROM cohort_assignments a JOIN users u ON u.id=a.user_id JOIN courses c ON c.id=a.course_id WHERE a.cohort_id=? AND (?=1 OR a.user_id=?) ORDER BY a.updated_at DESC`,
-          )
-          .all(c.id, teach ? 1 : 0, user.id)
-          .map((a) => assignmentDto(db, a))
+      ? (
+          db
+            .prepare(
+              `SELECT a.*,u.name AS learner_name,c.title AS course_title,c.exercise,c.skill FROM cohort_assignments a JOIN users u ON u.id=a.user_id JOIN courses c ON c.id=a.course_id WHERE a.cohort_id=? AND (?=1 OR a.user_id=?) ORDER BY a.updated_at DESC`,
+            )
+            .all(c.id, teach ? 1 : 0, user.id) as unknown as Array<Record<string, unknown>>
+        ).map((a) => assignmentDto(db, a))
       : [];
   const members = memberRows(db, user, c);
   const sessions =
     teach || member
-      ? db
-          .prepare(
-            "SELECT * FROM cohort_sessions WHERE cohort_id=? ORDER BY starts_at",
-          )
-          .all(c.id)
+      ? (
+          db
+            .prepare(
+              "SELECT * FROM cohort_sessions WHERE cohort_id=? ORDER BY starts_at",
+            )
+            .all(c.id) as unknown as Array<{ id: string; starts_at: string }>
+        )
           .filter(
             (s) =>
               learning ||
-              db
-                .prepare(
-                  "SELECT 1 FROM cohort_attendance WHERE session_id=? AND user_id=?",
-                )
-                .get(s.id, user.id),
+              Boolean(
+                db
+                  .prepare(
+                    "SELECT 1 FROM cohort_attendance WHERE session_id=? AND user_id=?",
+                  )
+                  .get(s.id, user.id),
+              ),
           )
           .map((s) => ({
             ...s,
@@ -278,24 +358,29 @@ function detail(db, user, c) {
               .filter(
                 (m) =>
                   m.status === "active" ||
-                  db
-                    .prepare(
-                      "SELECT 1 FROM cohort_attendance WHERE session_id=? AND user_id=?",
-                    )
-                    .get(s.id, m.user_id),
+                  Boolean(
+                    db
+                      .prepare(
+                        "SELECT 1 FROM cohort_attendance WHERE session_id=? AND user_id=?",
+                      )
+                      .get(s.id, m.user_id),
+                  ),
               )
-              .map((m) => ({
-                user_id: m.user_id,
-                name: m.name,
-                status:
-                  db
-                    .prepare(
-                      "SELECT status FROM cohort_attendance WHERE session_id=? AND user_id=?",
-                    )
-                    .get(s.id, m.user_id)?.status || "unrecorded",
-              })),
+              .map((m) => {
+                const attRecord = db
+                  .prepare(
+                    "SELECT status FROM cohort_attendance WHERE session_id=? AND user_id=?",
+                  )
+                  .get(s.id, m.user_id) as unknown as { status: string } | undefined;
+                return {
+                  user_id: m.user_id,
+                  name: m.name,
+                  status: attRecord?.status || "unrecorded",
+                };
+              }),
           }))
       : [];
+
   return {
     cohort: summary(db, user, c),
     lessons: learning
@@ -305,12 +390,13 @@ function detail(db, user, c) {
       : [],
     members,
     progress: member
-      ? db
-          .prepare(
-            "SELECT lesson_id FROM cohort_progress WHERE cohort_id=? AND user_id=?",
-          )
-          .all(c.id, user.id)
-          .map((p) => p.lesson_id)
+      ? (
+          db
+            .prepare(
+              "SELECT lesson_id FROM cohort_progress WHERE cohort_id=? AND user_id=?",
+            )
+            .all(c.id, user.id) as unknown as Array<{ lesson_id: string }>
+        ).map((p) => p.lesson_id)
       : [],
     assignment: rows.find((a) => a.user_id === user.id) || null,
     assignments: teach ? rows : [],
@@ -318,21 +404,24 @@ function detail(db, user, c) {
     ...candidates(db, user, c),
   };
 }
-function checkVersion(row, body) {
+
+function checkVersion(row: { version: number }, body: Record<string, unknown>) {
   check(
     Number.isInteger(body.version) && body.version === row.version,
     409,
     "Dữ liệu đã thay đổi. Hãy tải lại trước khi lưu.",
   );
 }
-function ensureWritable(c) {
+
+function ensureWritable(c: CohortRecord) {
   check(
     ["draft", "open"].includes(c.status),
     409,
     "Lớp đã đóng; dữ liệu chỉ được đọc.",
   );
 }
-function learnerWrite(db, user, c) {
+
+function learnerWrite(db: DatabaseSync, user: AuthUser, c: CohortRecord) {
   check(
     membership(db, user, c.id)?.status === "active",
     403,
@@ -340,7 +429,8 @@ function learnerWrite(db, user, c) {
   );
   check(c.status === "open", 409, "Lớp chưa mở hoặc đã đóng.");
 }
-function fields(body, old = {}) {
+
+function fields(body: Record<string, unknown>, old: Partial<CohortRecord> = {}) {
   const data = { ...old, ...body };
   check(
     typeof data.start_date === "string" &&
@@ -361,103 +451,125 @@ function fields(body, old = {}) {
   );
   check(
     Number.isInteger(data.capacity) &&
-      data.capacity > 0 &&
-      data.capacity <= 10000,
+      (data.capacity as number) > 0 &&
+      (data.capacity as number) <= 10000,
     400,
     "Sĩ số phải từ 1 đến 10.000.",
   );
   check(
-    ["draft", "open", "closed", "archived"].includes(data.status || "draft"),
+    ["draft", "open", "closed", "archived"].includes((data.status as string) || "draft"),
     400,
     "Trạng thái lớp không hợp lệ.",
   );
   return {
     title: textField(data.title, "Tên lớp", 180),
     code: textField(data.code, "Mã lớp", 60),
-    start_date: data.start_date,
-    end_date: data.end_date,
-    capacity: data.capacity,
-    status: data.status || "draft",
+    start_date: data.start_date as string,
+    end_date: data.end_date as string,
+    capacity: data.capacity as number,
+    status: (data.status as string) || "draft",
   };
 }
-function staffIds(db, ids) {
+
+function staffIds(db: DatabaseSync, rawIds: unknown): string[] {
   check(
-    Array.isArray(ids) &&
-      ids.length > 0 &&
-      ids.length <= 100 &&
-      ids.every((id) => typeof id === "string"),
+    Array.isArray(rawIds) &&
+      rawIds.length > 0 &&
+      rawIds.length <= 100 &&
+      rawIds.every((id) => typeof id === "string"),
     400,
     "Lớp cần ít nhất một giảng viên đang hoạt động.",
   );
-  ids = [...new Set(ids)];
+  const ids = [...new Set(rawIds as string[])];
   check(
     ids.every((id) =>
-      db
-        .prepare(
-          "SELECT 1 FROM users WHERE id=? AND role='instructor' AND active=1",
-        )
-        .get(id),
+      Boolean(
+        db
+          .prepare(
+            "SELECT 1 FROM users WHERE id=? AND role='instructor' AND active=1",
+          )
+          .get(id),
+      ),
     ),
     400,
     "Giảng viên không hợp lệ hoặc đã ngừng hoạt động.",
   );
   return ids;
 }
-function setStaff(db, id, ids) {
+
+function setStaff(db: DatabaseSync, id: string, ids: string[]) {
   db.prepare("DELETE FROM cohort_instructors WHERE cohort_id=?").run(id);
-  for (const userId of ids)
+  for (const userId of ids) {
     db.prepare("INSERT INTO cohort_instructors VALUES(?,?)").run(id, userId);
+  }
 }
-function notifyClass(db, c, message) {
-  for (const m of db
+
+function notifyClass(db: DatabaseSync, c: CohortRecord, message: string) {
+  const members = db
     .prepare(
       "SELECT u.id AS user_id FROM users u JOIN cohort_members m ON m.user_id=u.id WHERE m.cohort_id=? AND m.status='active' AND u.active=1 UNION SELECT u.id AS user_id FROM users u JOIN cohort_instructors i ON i.user_id=u.id WHERE i.cohort_id=? AND u.role='instructor' AND u.active=1",
     )
-    .all(c.id, c.id))
+    .all(c.id, c.id) as unknown as Array<{ user_id: string }>;
+
+  for (const m of members) {
     notify(db, m.user_id, message, `cohorts/${c.id}`);
+  }
 }
-function rosterAdd(db, user, c, ids, restore = false) {
+
+function rosterAdd(db: DatabaseSync, user: AuthUser, c: CohortRecord, rawIds: unknown, restore = false) {
   check(
-    Array.isArray(ids) &&
-      ids.length > 0 &&
-      ids.length <= 10000 &&
-      ids.every((id) => typeof id === "string"),
+    Array.isArray(rawIds) &&
+      rawIds.length > 0 &&
+      rawIds.length <= 10000 &&
+      rawIds.every((id) => typeof id === "string"),
     400,
     "Danh sách học viên không hợp lệ.",
   );
-  ids = [...new Set(ids)];
+  const ids = [...new Set(rawIds as string[])];
   check(
     restore ||
       !ids.some((id) =>
-        db
-          .prepare(
-            "SELECT 1 FROM cohort_members WHERE cohort_id=? AND user_id=? AND status='withdrawn'",
-          )
-          .get(c.id, id),
+        Boolean(
+          db
+            .prepare(
+              "SELECT 1 FROM cohort_members WHERE cohort_id=? AND user_id=? AND status='withdrawn'",
+            )
+            .get(c.id, id),
+        ),
       ),
     409,
     "Hãy khôi phục học viên từ danh sách lớp với phiên bản hiện tại.",
   );
-  for (const id of ids)
+
+  for (const id of ids) {
     check(
-      db.prepare("SELECT 1 FROM users WHERE id=? AND active=1").get(id),
+      Boolean(db.prepare("SELECT 1 FROM users WHERE id=? AND active=1").get(id)),
       400,
       "Học viên không hợp lệ hoặc đã ngừng hoạt động.",
     );
-  const active = db
-    .prepare(
-      "SELECT COUNT(*) n FROM cohort_members WHERE cohort_id=? AND status='active'",
-    )
-    .get(c.id).n;
+  }
+
+  const active = (
+    db
+      .prepare(
+        "SELECT COUNT(*) n FROM cohort_members WHERE cohort_id=? AND status='active'",
+      )
+      .get(c.id) as unknown as { n: number }
+  ).n;
+
   const additions = ids.filter(
     (id) =>
-      db
-        .prepare(
-          "SELECT status FROM cohort_members WHERE cohort_id=? AND user_id=?",
-        )
-        .get(c.id, id)?.status !== "active",
+      (
+        db
+          .prepare(
+            "SELECT status FROM cohort_members WHERE cohort_id=? AND user_id=?",
+          )
+          .get(c.id, id) as unknown as { status: string } | undefined
+      )?.status !== "active",
   );
+
   check(active + additions.length <= c.capacity, 409, "Lớp đã vượt quá sĩ số.");
+
   for (const id of additions) {
     db.prepare(
       "INSERT INTO cohort_members(cohort_id,user_id,created_at) VALUES(?,?,?) ON CONFLICT(cohort_id,user_id) DO UPDATE SET status='active',version=version+1",
@@ -468,10 +580,12 @@ function rosterAdd(db, user, c, ids, restore = false) {
     notify(db, id, `Bạn được thêm vào lớp ${c.title}.`, `cohorts/${c.id}`);
   }
 }
-function sessionFields(body, c, old = {}) {
-  const data = { ...old, ...body },
-    starts = Date.parse(data.starts_at),
-    ends = Date.parse(data.ends_at);
+
+function sessionFields(body: Record<string, unknown>, c: CohortRecord, old: Record<string, unknown> = {}) {
+  const data = { ...old, ...body };
+  const starts = Date.parse(data.starts_at as string);
+  const ends = Date.parse(data.ends_at as string);
+
   check(
     typeof data.starts_at === "string" &&
       typeof data.ends_at === "string" &&
@@ -489,7 +603,7 @@ function sessionFields(body, c, old = {}) {
     "Buổi học phải nằm trong thời gian của lớp.",
   );
   check(
-    ["scheduled", "cancelled"].includes(data.status || "scheduled"),
+    ["scheduled", "cancelled"].includes((data.status as string) || "scheduled"),
     400,
     "Trạng thái buổi học không hợp lệ.",
   );
@@ -498,36 +612,41 @@ function sessionFields(body, c, old = {}) {
     starts_at: new Date(starts).toISOString(),
     ends_at: new Date(ends).toISOString(),
     location: textField(data.location ?? "", "Địa điểm", 1000, 0),
-    status: data.status || "scheduled",
+    status: (data.status as string) || "scheduled",
   };
 }
-function reportRows(db, user, c) {
+
+function reportRows(db: DatabaseSync, user: AuthUser, c: CohortRecord) {
   return memberRows(db, user, c).map((m) => {
     const attendance = db
       .prepare(
         "SELECT a.status,COUNT(*) n FROM cohort_attendance a JOIN cohort_sessions s ON s.id=a.session_id WHERE s.cohort_id=? AND a.user_id=? AND s.status='scheduled' GROUP BY a.status",
       )
-      .all(c.id, m.user_id);
+      .all(c.id, m.user_id) as unknown as Array<{ status: string; n: number }>;
     const counts = Object.fromEntries(attendance.map((a) => [a.status, a.n]));
     return {
       ...m,
       present: counts.present || 0,
       absent: counts.absent || 0,
       excused: counts.excused || 0,
-      total_sessions: db
-        .prepare(
-          "SELECT COUNT(*) n FROM cohort_sessions WHERE cohort_id=? AND status='scheduled' AND starts_at<=?",
-        )
-        .get(c.id, now()).n,
+      total_sessions: (
+        db
+          .prepare(
+            "SELECT COUNT(*) n FROM cohort_sessions WHERE cohort_id=? AND status='scheduled' AND starts_at<=?",
+          )
+          .get(c.id, now()) as unknown as { n: number }
+      ).n,
     };
   });
 }
-function csvCell(value) {
+
+function csvCell(value: unknown): string {
   let text = String(value ?? "");
   if (/^[\s]*[=+@-]/.test(text)) text = "'" + text;
   return '"' + text.replaceAll('"', '""') + '"';
 }
-export function classEvidence(db, user) {
+
+export function classEvidence(db: DatabaseSync, user: AuthUser) {
   return db
     .prepare(
       `SELECT e.*,u.name AS reviewer_name,c.title AS course_title,h.id AS cohort_id,h.title AS cohort_title,h.code AS cohort_code FROM cohort_evidence e JOIN users u ON u.id=e.reviewer_id JOIN cohort_assignments a ON a.id=e.assignment_id JOIN courses c ON c.id=a.course_id JOIN cohorts h ON h.id=a.cohort_id WHERE e.user_id=? ORDER BY e.created_at DESC`,
@@ -535,15 +654,16 @@ export function classEvidence(db, user) {
     .all(user.id);
 }
 
-export function generateCohortReminders(db, timestamp = Date.now()) {
+export function generateCohortReminders(db: DatabaseSync, timestamp = Date.now()): void {
   if (
     !db
       .prepare(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='cohort_sessions'",
       )
       .get()
-  )
+  ) {
     return;
+  }
   const sessions = db
     .prepare(
       "SELECT s.*,c.title AS cohort_title FROM cohort_sessions s JOIN cohorts c ON c.id=s.cohort_id WHERE c.status='open' AND s.status='scheduled' AND s.starts_at>? AND s.starts_at<=?",
@@ -551,14 +671,16 @@ export function generateCohortReminders(db, timestamp = Date.now()) {
     .all(
       new Date(timestamp).toISOString(),
       new Date(timestamp + 24 * 3600000).toISOString(),
-    );
+    ) as unknown as Array<{ id: string; cohort_id: string; title: string; cohort_title: string; starts_at: string }>;
+
   for (const session of sessions) {
     const recipients = db
       .prepare(
         "SELECT u.id FROM users u JOIN cohort_members m ON m.user_id=u.id WHERE m.cohort_id=? AND m.status='active' AND u.active=1 UNION SELECT u.id FROM users u JOIN cohort_instructors i ON i.user_id=u.id WHERE i.cohort_id=? AND u.active=1 AND u.role='instructor'",
       )
-      .all(session.cohort_id, session.cohort_id);
-    for (const recipient of recipients)
+      .all(session.cohort_id, session.cohort_id) as unknown as Array<{ id: string }>;
+
+    for (const recipient of recipients) {
       notify(
         db,
         recipient.id,
@@ -566,6 +688,7 @@ export function generateCohortReminders(db, timestamp = Date.now()) {
         `cohorts/${session.cohort_id}`,
         `cohort-reminder:${session.id}:${session.starts_at}`,
       );
+    }
   }
 }
 
@@ -576,17 +699,27 @@ export function handleCohorts({
   method,
   body = {},
   query = new URLSearchParams(),
-}) {
+}: {
+  db: DatabaseSync;
+  user: AuthUser;
+  path: string;
+  method: string;
+  body?: Record<string, unknown>;
+  query?: URLSearchParams;
+}): { status: number; data: unknown } | null {
   if (path !== "/api/cohorts" && !path.startsWith("/api/cohorts/")) return null;
   check(account(db, user), 401, "Tài khoản không còn hoạt động.");
+
   if (path === "/api/cohorts") {
-    if (method === "GET")
+    if (method === "GET") {
+      const allCohorts = db
+        .prepare(
+          "SELECT h.*,c.title AS course_title,c.exercise,c.skill,c.owner_id FROM cohorts h JOIN courses c ON c.id=h.course_id ORDER BY h.created_at DESC",
+        )
+        .all() as unknown as CohortRecord[];
+
       return result({
-        cohorts: db
-          .prepare(
-            "SELECT h.*,c.title AS course_title,c.exercise,c.skill,c.owner_id FROM cohorts h JOIN courses c ON c.id=h.course_id ORDER BY h.created_at DESC",
-          )
-          .all()
+        cohorts: allCohorts
           .filter(
             (c) =>
               cohortReadAccess(db, user, c.id) ||
@@ -595,7 +728,9 @@ export function handleCohorts({
           .map((c) => summary(db, user, c)),
         ...candidates(db, user),
       });
-    if (method === "POST")
+    }
+
+    if (method === "POST") {
       return transaction(db, () => {
         check(
           typeof body.course_id === "string" && body.course_id.length > 0,
@@ -604,15 +739,15 @@ export function handleCohorts({
         );
         const course = db
           .prepare("SELECT * FROM courses WHERE id=? AND status='published'")
-          .get(body.course_id);
+          .get(body.course_id) as unknown as { id: string } | undefined;
         check(course, 404, "Chỉ tạo lớp từ khóa học đã xuất bản.");
         check(
           leadAccess(db, user, course.id),
           403,
           "Chỉ quản trị viên hoặc chủ khóa học có thể tạo lớp.",
         );
-        const f = fields({ ...body, status: "draft" }),
-          ids = staffIds(db, body.instructor_ids);
+        const f = fields({ ...body, status: "draft" });
+        const ids = staffIds(db, body.instructor_ids);
         check(
           !db
             .prepare("SELECT 1 FROM cohorts WHERE code=? COLLATE NOCASE")
@@ -636,20 +771,25 @@ export function handleCohorts({
           now(),
         );
         setStaff(db, id, ids);
-        for (const staff of ids)
+        for (const staff of ids) {
           notify(
             db,
             staff,
             `Bạn được phân công giảng dạy lớp ${f.title}.`,
             `cohorts/${id}`,
           );
+        }
         return result({ cohort: summary(db, user, getCohort(db, id)) }, 201);
       });
+    }
     return null;
   }
+
   const match = path.match(/^\/api\/cohorts\/([^/]+)(?:\/(.*))?$/);
   if (!match) return null;
-  const [, id, rest = ""] = match;
+  const id = match[1];
+  const rest = match[2] || "";
+
   if (method === "GET") {
     const c = getCohort(db, id);
     check(
@@ -660,7 +800,7 @@ export function handleCohorts({
     if (!rest) return result(detail(db, user, c));
     if (rest === "report") {
       check(
-        cohortTeachAccess(db, user, id) || managedLearners(db, user, id).length,
+        cohortTeachAccess(db, user, id) || managedLearners(db, user, id).length > 0,
         403,
         "Bạn không có quyền xem báo cáo lớp.",
       );
@@ -686,7 +826,7 @@ export function handleCohorts({
             [
               keys.map(csvCell).join(","),
               ...rows.map((row) =>
-                keys.map((key) => csvCell(row[key])).join(","),
+                keys.map((key) => csvCell((row as Record<string, unknown>)[key])).join(","),
               ),
             ].join("\r\n"),
           fileName: `class-${c.id}.csv`,
@@ -696,19 +836,22 @@ export function handleCohorts({
     }
     return null;
   }
+
   return transaction(db, () => {
-    const c = getCohort(db, id),
-      teach = cohortTeachAccess(db, user, id),
-      lead = leadAccess(db, user, c.course_id);
+    const c = getCohort(db, id);
+    const teach = cohortTeachAccess(db, user, id);
+    const lead = leadAccess(db, user, c.course_id);
+
     if (!rest && method === "PATCH") {
       check(teach || lead, 404, "Không tìm thấy lớp học.");
       checkVersion(c, body);
-      if (["closed", "archived"].includes(c.status))
+      if (["closed", "archived"].includes(c.status)) {
         check(
           lead,
           403,
           "Chỉ quản trị viên hoặc chủ khóa học có thể mở lại lớp.",
         );
+      }
       const f = fields(body, c);
       check(
         !db
@@ -720,11 +863,13 @@ export function handleCohorts({
         "Mã lớp đã được sử dụng.",
       );
       check(
-        db
-          .prepare(
-            "SELECT COUNT(*) n FROM cohort_members WHERE cohort_id=? AND status='active'",
-          )
-          .get(id).n <= f.capacity,
+        (
+          db
+            .prepare(
+              "SELECT COUNT(*) n FROM cohort_members WHERE cohort_id=? AND status='active'",
+            )
+            .get(id) as unknown as { n: number }
+        ).n <= f.capacity,
         409,
         "Sĩ số nhỏ hơn danh sách đang học.",
       );
@@ -764,30 +909,32 @@ export function handleCohorts({
       notifyClass(db, c, `Lớp ${f.title} đã cập nhật thông tin.`);
       return result({ cohort: summary(db, user, getCohort(db, id)) });
     }
+
     if (rest === "members" && method === "POST") {
       check(teach, 404, "Không tìm thấy lớp học.");
       ensureWritable(c);
       rosterAdd(db, user, c, body.user_ids);
       return result();
     }
-    let action = rest.match(/^members\/([^/]+)$/);
-    if (action && method === "PATCH") {
+
+    const memberAction = rest.match(/^members\/([^/]+)$/);
+    if (memberAction && method === "PATCH") {
       check(teach, 404, "Không tìm thấy lớp học.");
       ensureWritable(c);
       const member = db
         .prepare("SELECT * FROM cohort_members WHERE cohort_id=? AND user_id=?")
-        .get(id, action[1]);
+        .get(id, memberAction[1]) as unknown as CohortMemberRecord | undefined;
       check(member, 404, "Không tìm thấy học viên.");
       checkVersion(member, body);
       check(
-        ["active", "withdrawn"].includes(body.status),
+        ["active", "withdrawn"].includes(body.status as string),
         400,
         "Trạng thái học viên không hợp lệ.",
       );
       if (body.status !== member.status) {
-        if (body.status === "active")
+        if (body.status === "active") {
           rosterAdd(db, user, c, [member.user_id], true);
-        else {
+        } else {
           db.prepare(
             "UPDATE cohort_members SET status='withdrawn',version=version+1 WHERE cohort_id=? AND user_id=?",
           ).run(id, member.user_id);
@@ -801,32 +948,36 @@ export function handleCohorts({
       }
       return result();
     }
-    action = rest.match(/^lessons\/([^/]+)\/complete$/);
-    if (action && method === "POST") {
+
+    const lessonAction = rest.match(/^lessons\/([^/]+)\/complete$/);
+    if (lessonAction && method === "POST") {
       learnerWrite(db, user, c);
       check(
-        db
-          .prepare("SELECT 1 FROM lessons WHERE id=? AND course_id=?")
-          .get(action[1], c.course_id),
+        Boolean(
+          db
+            .prepare("SELECT 1 FROM lessons WHERE id=? AND course_id=?")
+            .get(lessonAction[1], c.course_id),
+        ),
         404,
         "Không tìm thấy bài học.",
       );
       db.prepare("INSERT OR IGNORE INTO cohort_progress VALUES(?,?,?,?)").run(
         id,
         user.id,
-        action[1],
+        lessonAction[1],
         now(),
       );
       return result();
     }
-    action = rest.match(/^assignments\/([^/]+)\/(submit|review)$/);
-    if (action && method === "POST") {
-      const review = action[2] === "review",
-        a = db
-          .prepare(
-            "SELECT * FROM cohort_assignments WHERE id=? AND cohort_id=?",
-          )
-          .get(action[1], id);
+
+    const assignAction = rest.match(/^assignments\/([^/]+)\/(submit|review)$/);
+    if (assignAction && method === "POST") {
+      const review = assignAction[2] === "review";
+      const a = db
+        .prepare(
+          "SELECT * FROM cohort_assignments WHERE id=? AND cohort_id=?",
+        )
+        .get(assignAction[1], id) as unknown as { id: string; user_id: string; body: string; status: string; version: number } | undefined;
       check(
         a && (review ? teach : a.user_id === user.id),
         404,
@@ -839,28 +990,30 @@ export function handleCohorts({
           403,
           "Không thể tự đánh giá bài của mình.",
         );
-      } else learnerWrite(db, user, c);
+      } else {
+        learnerWrite(db, user, c);
+      }
       checkVersion(a, body);
-      let status,
-        content = a.body,
-        feedback = "",
-        level = null;
+      let status: string;
+      let content = a.body;
+      let feedback = "";
+      let level: number | null = null;
       if (review) {
         check(a.status === "submitted", 409, "Bài không còn chờ chấm.");
         check(
-          ["approved", "revision"].includes(body.status),
+          ["approved", "revision"].includes(body.status as string),
           400,
           "Kết quả đánh giá không hợp lệ.",
         );
-        status = body.status;
+        status = body.status as string;
         feedback = textField(body.feedback, "Phản hồi", 10000);
         if (status === "approved") {
           check(
-            Number.isInteger(body.level) && body.level >= 1 && body.level <= 4,
+            Number.isInteger(body.level) && (body.level as number) >= 1 && (body.level as number) <= 4,
             400,
             "Mức năng lực cần từ 1 đến 4.",
           );
-          level = body.level;
+          level = body.level as number;
         }
       } else {
         check(
@@ -888,7 +1041,7 @@ export function handleCohorts({
         a.version + 1,
         timestamp,
       );
-      if (status === "approved")
+      if (status === "approved") {
         db.prepare("INSERT INTO cohort_evidence VALUES(?,?,?,?,?,?)").run(
           a.id,
           a.user_id,
@@ -897,29 +1050,34 @@ export function handleCohorts({
           user.id,
           timestamp,
         );
-      if (review)
+      }
+      if (review) {
         notify(
           db,
           a.user_id,
           `Bài tập lớp ${c.title} đã được đánh giá.`,
           `cohorts/${id}`,
         );
-      else
-        for (const staff of instructors(db, id))
-          if (staff.id !== user.id)
+      } else {
+        for (const staff of instructors(db, id)) {
+          if (staff.id !== user.id) {
             notify(
               db,
               staff.id,
               `Có bài nộp mới trong lớp ${c.title}.`,
               `cohorts/${id}`,
             );
+          }
+        }
+      }
       return result();
     }
+
     if (rest === "sessions" && method === "POST") {
       check(teach, 404, "Không tìm thấy lớp học.");
       ensureWritable(c);
-      const f = sessionFields(body, c),
-        sessionId = randomUUID();
+      const f = sessionFields(body, c);
+      const sessionId = randomUUID();
       db.prepare(
         "INSERT INTO cohort_sessions(id,cohort_id,title,starts_at,ends_at,location,status,created_at) VALUES(?,?,?,?,?,?,?,?)",
       ).run(
@@ -942,19 +1100,20 @@ export function handleCohorts({
         201,
       );
     }
-    action = rest.match(/^sessions\/([^/]+)(?:\/(attendance))?$/);
+
+    const sessAction = rest.match(/^sessions\/([^/]+)(?:\/(attendance))?$/);
     if (
-      action &&
-      ((method === "PATCH" && !action[2]) || (method === "PUT" && action[2]))
+      sessAction &&
+      ((method === "PATCH" && !sessAction[2]) || (method === "PUT" && sessAction[2]))
     ) {
       check(teach, 404, "Không tìm thấy lớp học.");
       ensureWritable(c);
       const session = db
         .prepare("SELECT * FROM cohort_sessions WHERE id=? AND cohort_id=?")
-        .get(action[1], id);
+        .get(sessAction[1], id) as unknown as { id: string; version: number; status: string; starts_at: string } | undefined;
       check(session, 404, "Không tìm thấy buổi học.");
       checkVersion(session, body);
-      if (action[2]) {
+      if (sessAction[2]) {
         check(
           session.status === "scheduled" &&
             Date.parse(session.starts_at) <= Date.now(),
@@ -966,8 +1125,8 @@ export function handleCohorts({
           400,
           "Danh sách điểm danh không hợp lệ.",
         );
-        const seen = new Set();
-        for (const r of body.records) {
+        const seen = new Set<string>();
+        for (const r of body.records as Array<{ user_id: string; status: string }>) {
           check(
             r &&
               typeof r.user_id === "string" &&
@@ -978,19 +1137,22 @@ export function handleCohorts({
           );
           seen.add(r.user_id);
           check(
-            db
-              .prepare(
-                "SELECT 1 FROM cohort_members WHERE cohort_id=? AND user_id=? AND status='active'",
-              )
-              .get(id, r.user_id),
+            Boolean(
+              db
+                .prepare(
+                  "SELECT 1 FROM cohort_members WHERE cohort_id=? AND user_id=? AND status='active'",
+                )
+                .get(id, r.user_id),
+            ),
             400,
             "Chỉ điểm danh học viên đang trong lớp.",
           );
         }
-        for (const r of body.records)
+        for (const r of body.records as Array<{ user_id: string; status: string }>) {
           db.prepare(
             "INSERT INTO cohort_attendance VALUES(?,?,?,?,?) ON CONFLICT(session_id,user_id) DO UPDATE SET status=excluded.status,recorded_by=excluded.recorded_by,updated_at=excluded.updated_at",
           ).run(session.id, r.user_id, r.status, user.id, now());
+        }
         db.prepare(
           "UPDATE cohort_sessions SET version=version+1 WHERE id=?",
         ).run(session.id);
@@ -1000,7 +1162,7 @@ export function handleCohorts({
           409,
           "Không thể đổi buổi học đã bắt đầu.",
         );
-        const f = sessionFields(body, c, session);
+        const f = sessionFields(body, c, session as unknown as Record<string, unknown>);
         db.prepare(
           "UPDATE cohort_sessions SET title=?,starts_at=?,ends_at=?,location=?,status=?,version=version+1 WHERE id=?",
         ).run(

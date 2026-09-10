@@ -59,12 +59,14 @@ export interface AppState {
   enrolled: string[];
   completed: string[];
   notifications: NotificationItem[];
+  bookmarks?: string[];
   progress?: Record<string, number>;
-  [key: string]: any;
+  user?: LiveUser;
+  [key: string]: unknown;
 }
 
 export interface AppContextType {
-  state: AppState;
+  state: AppState & { [key: string]: any };
   dispatch: (action: any) => void;
   role: Role;
   selectRole: (role: Role) => void;
@@ -87,4 +89,6 @@ export interface LiveUser {
   email: string;
   role: Role;
   status?: string;
+  team?: string;
+  job?: string;
 }

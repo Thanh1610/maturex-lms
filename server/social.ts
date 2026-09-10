@@ -1,17 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { check, textField } from "./auth.js";
-import { transaction } from "./database.js";
+import { check, type PublicUser, textField } from "./auth";
+import { type AppDatabase, transaction } from "./database";
 
 const now = () => new Date().toISOString();
-const result = (data = { ok: true }, status = 200) => ({ status, data });
-const teacher = (user) =>
+const result = (
+  data: Record<string, unknown> = { ok: true },
+  status = 200,
+): { status: number; data: Record<string, unknown> } => ({ status, data });
+
+const teacher = (user: { role: string }) =>
   check(
     ["admin", "instructor"].includes(user.role),
     403,
     "Bạn không có quyền quản lý lịch học.",
   );
 
-export function initSocial(db) {
+export function initSocial(db: AppDatabase): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS events (
       id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL,
@@ -46,14 +50,22 @@ export function initSocial(db) {
   `);
 }
 
-export function notify(db, userId, text, route, dedupeKey = null) {
+export function notify(
+  db: AppDatabase,
+  userId: string,
+  text: string,
+  route: string,
+  dedupeKey: string | null = null,
+): void {
   db.prepare(
     "INSERT OR IGNORE INTO notifications (id,user_id,text,route,created_at,dedupe_key) VALUES (?,?,?,?,?,?)",
   ).run(randomUUID(), userId, text, route, now(), dedupeKey);
 }
 
-// Safe to run periodically and when users load their inbox. Unique keys survive restarts.
-export function generateEventReminders(db, timestamp = Date.now()) {
+export function generateEventReminders(
+  db: AppDatabase,
+  timestamp = Date.now(),
+): void {
   const due = db
     .prepare(
       `SELECT e.id,e.title,e.starts_at,a.user_id FROM events e JOIN event_attendees a ON a.event_id=e.id
@@ -62,8 +74,13 @@ export function generateEventReminders(db, timestamp = Date.now()) {
     .all(
       new Date(timestamp).toISOString(),
       new Date(timestamp + 24 * 3600000).toISOString(),
-    );
-  for (const item of due)
+    ) as Array<{
+    id: string;
+    title: string;
+    starts_at: string;
+    user_id: string;
+  }>;
+  for (const item of due) {
     notify(
       db,
       item.user_id,
@@ -71,14 +88,36 @@ export function generateEventReminders(db, timestamp = Date.now()) {
       "calendar",
       `event-reminder:${item.id}:${item.starts_at}`,
     );
+  }
 }
 
-function getEvent(db, id) {
-  const event = db.prepare("SELECT * FROM events WHERE id=?").get(id);
+interface EventRow {
+  id: string;
+  owner_id: string;
+  title: string;
+  description: string;
+  location: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  status: string;
+  version: number;
+  created_at: string;
+}
+
+function getEvent(db: AppDatabase, id: string): EventRow {
+  const event = db.prepare("SELECT * FROM events WHERE id=?").get(id) as unknown as
+    | EventRow
+    | undefined;
   check(event, 404, "Không tìm thấy lịch học.");
   return event;
 }
-function manageEvent(db, user, id) {
+
+function manageEvent(
+  db: AppDatabase,
+  user: { id: string; role: string },
+  id: string,
+): EventRow {
   teacher(user);
   const event = getEvent(db, id);
   check(
@@ -88,9 +127,21 @@ function manageEvent(db, user, id) {
   );
   return event;
 }
-function fields(body) {
-  const starts = Date.parse(body.starts_at),
-    ends = Date.parse(body.ends_at);
+
+interface EventFields {
+  title: string;
+  description: string;
+  location: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+}
+
+function fields(body: Record<string, unknown>): EventFields {
+  const startsStr = String(body.starts_at || "");
+  const endsStr = String(body.ends_at || "");
+  const starts = Date.parse(startsStr);
+  const ends = Date.parse(endsStr);
   check(
     typeof body.starts_at === "string" &&
       typeof body.ends_at === "string" &&
@@ -104,10 +155,9 @@ function fields(body) {
     400,
     "Lịch học phải bắt đầu trong tương lai và kết thúc sau giờ bắt đầu.",
   );
+  const capacity = Number(body.capacity);
   check(
-    Number.isInteger(body.capacity) &&
-      body.capacity > 0 &&
-      body.capacity <= 10000,
+    Number.isInteger(capacity) && capacity > 0 && capacity <= 10000,
     400,
     "Số chỗ cần từ 1 đến 10.000.",
   );
@@ -117,24 +167,37 @@ function fields(body) {
     location: textField(body.location, "Địa điểm hoặc liên kết", 1000),
     starts_at: new Date(starts).toISOString(),
     ends_at: new Date(ends).toISOString(),
-    capacity: body.capacity,
+    capacity,
   };
 }
-function checkVersion(event, body) {
+
+function checkVersion(event: EventRow, body: Record<string, unknown>): void {
   check(
     Number.isInteger(body.version) && body.version === event.version,
     409,
     "Lịch học đã thay đổi. Hãy tải lại trước khi lưu.",
   );
 }
-function eventNotice(db, event, text, key) {
-  for (const attendee of db
+
+function eventNotice(
+  db: AppDatabase,
+  event: EventRow,
+  text: string,
+  key: string,
+): void {
+  const rows = db
     .prepare("SELECT user_id FROM event_attendees WHERE event_id=?")
-    .all(event.id))
+    .all(event.id) as Array<{ user_id: string }>;
+  for (const attendee of rows) {
     notify(db, attendee.user_id, text, "calendar", key);
+  }
 }
-function eventList(db, user) {
-  return db
+
+function eventList(
+  db: AppDatabase,
+  user: { id: string; role: string },
+): Array<Record<string, unknown>> {
+  const events = db
     .prepare(
       `SELECT e.*,u.name AS owner_name,
     (SELECT COUNT(*) FROM event_attendees a WHERE a.event_id=e.id) AS attendee_count,
@@ -142,33 +205,37 @@ function eventList(db, user) {
     (SELECT attendance FROM event_attendees a WHERE a.event_id=e.id AND a.user_id=?) AS attendance
     FROM events e JOIN users u ON u.id=e.owner_id ORDER BY e.starts_at`,
     )
-    .all(user.id, user.id)
-    .map((event) => ({
-      ...event,
-      ...(user.role === "admin" ||
-      (user.role === "instructor" && event.owner_id === user.id)
-        ? {
-            attendees: db
-              .prepare(
-                `SELECT a.user_id,a.attendance,u.name FROM event_attendees a JOIN users u ON u.id=a.user_id WHERE a.event_id=? ORDER BY u.name`,
-              )
-              .all(event.id),
-          }
-        : {}),
-    }));
+    .all(user.id, user.id) as Array<Record<string, unknown>>;
+
+  return events.map((event) => ({
+    ...event,
+    ...(user.role === "admin" ||
+    (user.role === "instructor" && event.owner_id === user.id)
+      ? {
+          attendees: db
+            .prepare(
+              `SELECT a.user_id,a.attendance,u.name FROM event_attendees a JOIN users u ON u.id=a.user_id WHERE a.event_id=? ORDER BY u.name`,
+            )
+            .all(String(event.id)),
+        }
+      : {}),
+  }));
 }
-const escapeIcs = (value) =>
+
+const escapeIcs = (value: unknown) =>
   String(value)
     .replace(/\\/g, "\\\\")
     .replace(/\r\n|\n|\r/g, "\\n")
     .replace(/;/g, "\\;")
     .replace(/,/g, "\\,");
-const icsDate = (value) =>
+
+const icsDate = (value: string | number) =>
   new Date(value)
     .toISOString()
     .replace(/[-:]/g, "")
     .replace(/\.\d{3}/, "");
-function calendarFile(event) {
+
+function calendarFile(event: EventRow): { ics: string; fileName: string } {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -187,10 +254,9 @@ function calendarFile(event) {
     "END:VEVENT",
     "END:VCALENDAR",
   ];
-  // Fold at 75 UTF-8 bytes without splitting multibyte characters (RFC 5545).
   const folded = lines.map((line) => {
-    let output = "",
-      bytes = 0;
+    let output = "";
+    let bytes = 0;
     for (const char of line) {
       const size = Buffer.byteLength(char);
       if (bytes + size > 75) {
@@ -203,15 +269,29 @@ function calendarFile(event) {
     return output;
   });
   return {
-    ics: folded.join("\r\n") + "\r\n",
+    ics: `${folded.join("\r\n")}\r\n`,
     fileName: `maturex-${event.id}.ics`,
   };
 }
 
-export function handleSocial({ db, user, path, method, body = {}, query }) {
-  let match;
-  if (path === "/api/events" && method === "GET")
+export function handleSocial({
+  db,
+  user,
+  path,
+  method,
+  body = {},
+  query,
+}: {
+  db: AppDatabase;
+  user: PublicUser;
+  path: string;
+  method: string;
+  body?: Record<string, unknown>;
+  query?: URLSearchParams | Record<string, string>;
+}): { status: number; data: Record<string, unknown> } | null {
+  if (path === "/api/events" && method === "GET") {
     return result({ events: eventList(db, user) });
+  }
   if (path === "/api/events" && method === "POST") {
     teacher(user);
     const value = fields(body);
@@ -231,7 +311,8 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
     );
     return result({ event: getEvent(db, id) }, 201);
   }
-  if ((match = path.match(/^\/api\/events\/([^/]+)$/)) && method === "PUT")
+  let match = path.match(/^\/api\/events\/([^/]+)$/);
+  if (match && method === "PUT") {
     return transaction(db, () => {
       const event = manageEvent(db, user, match[1]);
       checkVersion(event, body);
@@ -242,9 +323,11 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
         "Chỉ sửa lịch chưa bắt đầu và chưa hủy.",
       );
       const value = fields(body);
-      const count = db
-        .prepare("SELECT COUNT(*) n FROM event_attendees WHERE event_id=?")
-        .get(event.id).n;
+      const count = (
+        db
+          .prepare("SELECT COUNT(*) n FROM event_attendees WHERE event_id=?")
+          .get(event.id) as { n: number }
+      ).n;
       check(
         value.capacity >= count,
         409,
@@ -269,10 +352,9 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       );
       return result({ event: getEvent(db, event.id) });
     });
-  if (
-    (match = path.match(/^\/api\/events\/([^/]+)\/cancel$/)) &&
-    method === "POST"
-  )
+  }
+  match = path.match(/^\/api\/events\/([^/]+)\/cancel$/);
+  if (match && method === "POST") {
     return transaction(db, () => {
       const event = manageEvent(db, user, match[1]);
       checkVersion(event, body);
@@ -293,10 +375,9 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       );
       return result();
     });
-  if (
-    (match = path.match(/^\/api\/events\/([^/]+)\/enroll$/)) &&
-    ["POST", "DELETE"].includes(method)
-  )
+  }
+  match = path.match(/^\/api\/events\/([^/]+)\/enroll$/);
+  if (match && ["POST", "DELETE"].includes(method)) {
     return transaction(db, () => {
       const event = getEvent(db, match[1]);
       check(
@@ -318,9 +399,11 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
             .get(event.id, user.id)
         )
           return result();
-        const count = db
-          .prepare("SELECT COUNT(*) n FROM event_attendees WHERE event_id=?")
-          .get(event.id).n;
+        const count = (
+          db
+            .prepare("SELECT COUNT(*) n FROM event_attendees WHERE event_id=?")
+            .get(event.id) as { n: number }
+        ).n;
         check(count < event.capacity, 409, "Lịch học đã hết chỗ.");
         db.prepare(
           "INSERT INTO event_attendees (event_id,user_id,created_at) VALUES (?,?,?)",
@@ -334,18 +417,18 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       }
       return result();
     });
-  if (
-    (match = path.match(/^\/api\/events\/([^/]+)\/attendance\/([^/]+)$/)) &&
-    method === "POST"
-  ) {
+  }
+  match = path.match(/^\/api\/events\/([^/]+)\/attendance\/([^/]+)$/);
+  if (match && method === "POST") {
     const event = manageEvent(db, user, match[1]);
     check(
       event.status === "scheduled" && Date.parse(event.starts_at) <= Date.now(),
       409,
       "Chỉ điểm danh khi lịch học đã bắt đầu và chưa hủy.",
     );
+    const attendance = String(body.attendance || "");
     check(
-      ["registered", "present", "absent"].includes(body.attendance),
+      ["registered", "present", "absent"].includes(attendance),
       400,
       "Trạng thái điểm danh không hợp lệ.",
     );
@@ -353,14 +436,16 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       .prepare(
         "UPDATE event_attendees SET attendance=? WHERE event_id=? AND user_id=?",
       )
-      .run(body.attendance, event.id, match[2]);
+      .run(attendance, event.id, match[2]);
     check(changed.changes, 404, "Người học chưa đăng ký lịch này.");
     return result();
   }
-  if ((match = path.match(/^\/api\/events\/([^/]+)\/ics$/)) && method === "GET")
+  match = path.match(/^\/api\/events\/([^/]+)\/ics$/);
+  if (match && method === "GET") {
     return result(calendarFile(getEvent(db, match[1])));
+  }
   if (path === "/api/community" && method === "GET") {
-    const raw = query?.get ? query.get("offset") : query?.offset;
+    const raw = query instanceof URLSearchParams ? query.get("offset") : (query as Record<string, string>)?.offset;
     const offset = Number(raw || 0);
     check(
       Number.isSafeInteger(offset) && offset >= 0,
@@ -373,14 +458,19 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       EXISTS(SELECT 1 FROM community_likes l WHERE l.post_id=p.id AND l.user_id=?) AS liked
       FROM community_posts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC,p.id DESC LIMIT 30 OFFSET ?`,
       )
-      .all(user.id, offset);
-    for (const post of posts)
+      .all(user.id, offset) as Array<Record<string, unknown>>;
+    for (const post of posts) {
       post.replies = db
         .prepare(
           "SELECT r.*,u.name AS author_name FROM community_replies r JOIN users u ON u.id=r.user_id WHERE post_id=? ORDER BY r.created_at,r.id",
         )
-        .all(post.id);
-    const total = db.prepare("SELECT COUNT(*) n FROM community_posts").get().n;
+        .all(String(post.id));
+    }
+    const total = (
+      db.prepare("SELECT COUNT(*) n FROM community_posts").get() as {
+        n: number;
+      }
+    ).n;
     return result({ posts, total });
   }
   if (path === "/api/community" && method === "POST") {
@@ -395,14 +485,13 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
     ).run(post.id, post.user_id, post.body, post.created_at);
     return result({ post }, 201);
   }
-  if (
-    (match = path.match(
-      /^\/api\/community\/([^/]+)(?:\/(replies|like)(?:\/([^/]+))?)?$/,
-    ))
-  ) {
+  match = path.match(
+    /^\/api\/community\/([^/]+)(?:\/(replies|like)(?:\/([^/]+))?)?$/,
+  );
+  if (match) {
     const post = db
       .prepare("SELECT * FROM community_posts WHERE id=?")
-      .get(match[1]);
+      .get(match[1]) as { id: string; user_id: string } | undefined;
     check(post, 404, "Không tìm thấy bài viết.");
     if (!match[2] && method === "DELETE") {
       check(
@@ -418,17 +507,18 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       !match[3] &&
       ["POST", "DELETE"].includes(method)
     ) {
-      if (method === "POST")
+      if (method === "POST") {
         db.prepare(
           "INSERT OR IGNORE INTO community_likes (post_id,user_id) VALUES (?,?)",
         ).run(post.id, user.id);
-      else
+      } else {
         db.prepare(
           "DELETE FROM community_likes WHERE post_id=? AND user_id=?",
         ).run(post.id, user.id);
+      }
       return result();
     }
-    if (match[2] === "replies" && !match[3] && method === "POST")
+    if (match[2] === "replies" && !match[3] && method === "POST") {
       return transaction(db, () => {
         const reply = {
           id: randomUUID(),
@@ -446,7 +536,7 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
           reply.body,
           reply.created_at,
         );
-        if (post.user_id !== user.id)
+        if (post.user_id !== user.id) {
           notify(
             db,
             post.user_id,
@@ -454,12 +544,14 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
             "community",
             `reply:${reply.id}`,
           );
+        }
         return result({ reply }, 201);
       });
+    }
     if (match[2] === "replies" && match[3] && method === "DELETE") {
       const reply = db
         .prepare("SELECT * FROM community_replies WHERE id=? AND post_id=?")
-        .get(match[3], post.id);
+        .get(match[3], post.id) as { id: string; user_id: string } | undefined;
       check(reply, 404, "Không tìm thấy phản hồi.");
       check(
         user.role === "admin" || reply.user_id === user.id,
@@ -476,7 +568,7 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
       .prepare(
         "SELECT id,user_id,text,route,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC,id DESC",
       )
-      .all(user.id);
+      .all(user.id) as Array<{ read_at?: string | null }>;
     return result({
       notifications,
       unread: notifications.filter((n) => !n.read_at).length,
@@ -488,10 +580,8 @@ export function handleSocial({ db, user, path, method, body = {}, query }) {
     ).run(now(), user.id);
     return result();
   }
-  if (
-    (match = path.match(/^\/api\/notifications\/([^/]+)\/read$/)) &&
-    method === "POST"
-  ) {
+  match = path.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if (match && method === "POST") {
     const changed = db
       .prepare(
         "UPDATE notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?",

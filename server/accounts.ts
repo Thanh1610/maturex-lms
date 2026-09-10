@@ -1,15 +1,26 @@
-import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { IncomingMessage } from "node:http";
 import {
-  check,
-  textField,
-  publicUser,
-  hashPassword,
-  verifyPassword,
   authenticate,
-} from "./auth.js";
-import { transaction } from "./database.js";
-const digest = (value) => createHash("sha256").update(value).digest("hex");
-export function audit(db, actor, action, target) {
+  check,
+  hashPassword,
+  publicUser,
+  textField,
+  type PublicUser,
+  type UserRow,
+  verifyPassword,
+} from "./auth";
+import { type AppDatabase, transaction } from "./database";
+
+const digest = (value: string): string =>
+  createHash("sha256").update(value).digest("hex");
+
+export function audit(
+  db: AppDatabase,
+  actor: string | null | undefined,
+  action: string,
+  target: string | null | undefined,
+): void {
   db.prepare("INSERT INTO audit_log VALUES (?,?,?,?,?)").run(
     randomUUID(),
     actor || null,
@@ -18,7 +29,8 @@ export function audit(db, actor, action, target) {
     new Date().toISOString(),
   );
 }
-function resetLink(db, userId) {
+
+function resetLink(db: AppDatabase, userId: string): string {
   const token = randomBytes(32).toString("hex");
   db.prepare("DELETE FROM password_resets WHERE user_id=? OR expires_at<?").run(
     userId,
@@ -31,28 +43,44 @@ function resetLink(db, userId) {
   );
   return token;
 }
+
 export async function handlePublicAccounts({
   db,
   path,
   method,
-  body,
+  body = {},
   integrations,
   origin,
-}) {
+}: {
+  db: AppDatabase;
+  path: string;
+  method: string;
+  body?: Record<string, unknown>;
+  integrations?: {
+    status: () => { smtp: { configured: boolean } };
+    enqueueEmail: (opts: {
+      to: string;
+      subject: string;
+      text: string;
+      key: string;
+    }) => Promise<unknown> | unknown;
+  };
+  origin: string;
+}): Promise<{ status: number; data: Record<string, unknown> } | null> {
   if (method !== "POST") return null;
   if (path === "/api/password/forgot") {
     const email =
       typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const user = db
       .prepare("SELECT id FROM users WHERE email=? AND active=1")
-      .get(email);
+      .get(email) as { id: string } | undefined;
     if (user && integrations?.status().smtp.configured) {
       const token = resetLink(db, user.id);
       await integrations.enqueueEmail({
         to: email,
         subject: "Đặt lại mật khẩu MatureX LMS",
         text: `Mở ${origin}/#reset/${token} để đặt mật khẩu mới. Liên kết có hiệu lực 20 phút.`,
-        key: "reset-" + digest(token),
+        key: `reset-${digest(token)}`,
       });
     }
     return {
@@ -69,14 +97,15 @@ export async function handlePublicAccounts({
       400,
       "Liên kết không hợp lệ hoặc đã hết hạn.",
     );
-    const tokenHash = digest(body.token);
-    const hashed = await hashPassword(body.password);
+    const tokenHash = digest(body.token as string);
+    const passwordStr = String(body.password || "");
+    const hashed = await hashPassword(passwordStr);
     transaction(db, () => {
       const reset = db
         .prepare(
           "SELECT r.* FROM password_resets r JOIN users u ON u.id=r.user_id WHERE token_hash=? AND used_at IS NULL AND expires_at>? AND u.active=1",
         )
-        .get(tokenHash, Date.now());
+        .get(tokenHash, Date.now()) as { user_id: string } | undefined;
       check(reset, 400, "Liên kết không hợp lệ hoặc đã hết hạn.");
       db.prepare("UPDATE users SET password_hash=? WHERE id=?").run(
         hashed,
@@ -93,11 +122,26 @@ export async function handlePublicAccounts({
   }
   return null;
 }
-export async function handleAccounts({ db, user, path, method, body, req }) {
+
+export async function handleAccounts({
+  db,
+  user,
+  path,
+  method,
+  body = {},
+  req,
+}: {
+  db: AppDatabase;
+  user: PublicUser;
+  path: string;
+  method: string;
+  body?: Record<string, unknown>;
+  req?: IncomingMessage;
+}): Promise<{ status: number; data: Record<string, unknown> } | null> {
   if (path === "/api/account/preferences" && ["GET", "PUT"].includes(method)) {
     if (method === "PUT") {
       check(
-        typeof body?.email_notifications === "boolean",
+        typeof body.email_notifications === "boolean",
         400,
         "Tùy chọn thông báo email phải là bật hoặc tắt.",
       );
@@ -109,7 +153,7 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
       .prepare(
         "SELECT email_notifications FROM user_preferences WHERE user_id=?",
       )
-      .get(user.id);
+      .get(user.id) as { email_notifications: number } | undefined;
     return {
       status: 200,
       data: {
@@ -120,8 +164,8 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
     };
   }
   if (path === "/api/account/profile" && method === "PUT") {
-    const name = textField(body.name, "Họ tên", 100),
-      job = textField(body.job ?? "", "Chức danh", 150, 0);
+    const name = textField(body.name, "Họ tên", 100);
+    const job = textField(body.job ?? "", "Chức danh", 150, 0);
     db.prepare("UPDATE users SET name=?,job=? WHERE id=?").run(
       name,
       job,
@@ -131,19 +175,22 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
       status: 200,
       data: {
         user: publicUser(
-          db.prepare("SELECT * FROM users WHERE id=?").get(user.id),
+          db.prepare("SELECT * FROM users WHERE id=?").get(user.id) as unknown as UserRow,
         ),
       },
     };
   }
   if (path === "/api/account/password" && method === "POST") {
-    const record = db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
+    const record = db
+      .prepare("SELECT * FROM users WHERE id=?")
+      .get(user.id) as unknown as UserRow | undefined;
+    check(record, 404, "Không tìm thấy người dùng.");
     check(
       await verifyPassword(body.currentPassword, record.password_hash),
       400,
       "Mật khẩu hiện tại không đúng.",
     );
-    const hashed = await hashPassword(body.newPassword);
+    const hashed = await hashPassword(String(body.newPassword || ""));
     transaction(db, () => {
       check(req?.headers, 401, "Vui lòng đăng nhập để tiếp tục.");
       check(
@@ -153,7 +200,7 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
       );
       const current = db
         .prepare("SELECT active,password_hash FROM users WHERE id=?")
-        .get(user.id);
+        .get(user.id) as unknown as UserRow | undefined;
       check(current?.active === 1, 401, "Tài khoản không còn hoạt động.");
       check(
         current.password_hash === record.password_hash,
@@ -170,10 +217,12 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
     });
     return { status: 200, data: { ok: true, reauthenticate: true } };
   }
-  let match = path.match(/^\/api\/users\/([^/]+)(\/reset)?$/);
+  const match = path.match(/^\/api\/users\/([^/]+)(\/reset)?$/);
   if (match && ["PATCH", "POST"].includes(method)) {
     check(user.role === "admin", 403, "Chỉ quản trị được quản lý tài khoản.");
-    const target = db.prepare("SELECT * FROM users WHERE id=?").get(match[1]);
+    const target = db
+      .prepare("SELECT * FROM users WHERE id=?")
+      .get(match[1]) as unknown as UserRow | undefined;
     check(target, 404, "Không tìm thấy tài khoản.");
     if (match[2] && method === "POST") {
       check(
@@ -187,10 +236,11 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
     }
     if (!match[2] && method === "PATCH") {
       const name = textField(body.name, "Họ tên", 100);
-      const team = textField(body.team ?? "", "Nhóm", 100, 0),
-        job = textField(body.job ?? "", "Chức danh", 150, 0);
+      const team = textField(body.team ?? "", "Nhóm", 100, 0);
+      const job = textField(body.job ?? "", "Chức danh", 150, 0);
+      const role = String(body.role || "");
       check(
-        ["admin", "instructor", "learner", "manager"].includes(body.role),
+        ["admin", "instructor", "learner", "manager"].includes(role),
         400,
         "Vai trò không hợp lệ.",
       );
@@ -200,15 +250,15 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
         "Trạng thái tài khoản không hợp lệ.",
       );
       check(
-        target.id !== user.id || (body.active && body.role === "admin"),
+        target.id !== user.id || (body.active && role === "admin"),
         409,
         "Không thể tự tắt hoặc bỏ quyền quản trị của mình.",
       );
-      const manager = body.manager_id || null;
+      const manager = (body.manager_id as string) || null;
       if (manager) {
         const m = db
           .prepare("SELECT * FROM users WHERE id=? AND active=1")
-          .get(manager);
+          .get(manager) as unknown as UserRow | undefined;
         check(
           m && m.id !== target.id && (m.management || m.role === "admin"),
           400,
@@ -223,12 +273,11 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
           team,
           job,
           manager,
-          body.role === "manager" ? "learner" : body.role,
-          body.role === "manager" ? 1 : 0,
+          role === "manager" ? "learner" : role,
+          role === "manager" ? 1 : 0,
           body.active ? 1 : 0,
           target.id,
         );
-        // Revoke sessions on any administrative role/scope change.
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(target.id);
         audit(db, user.id, "user.update", target.id);
       });
@@ -236,7 +285,7 @@ export async function handleAccounts({ db, user, path, method, body, req }) {
         status: 200,
         data: {
           user: publicUser(
-            db.prepare("SELECT * FROM users WHERE id=?").get(target.id),
+            db.prepare("SELECT * FROM users WHERE id=?").get(target.id) as unknown as UserRow,
           ),
         },
       };

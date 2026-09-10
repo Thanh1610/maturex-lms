@@ -12,7 +12,7 @@ export function AIDraft({ onDraft }) {
   const [applied, setApplied] = useState(false);
   useEffect(() => {
     let active = true;
-    api("/integrations/status")
+    api<{ ai: { configured: boolean } }>("/integrations/status")
       .then((data) => {
         if (active) setConfigured(data.ai.configured);
       })
@@ -29,9 +29,11 @@ export function AIDraft({ onDraft }) {
     setError("");
     setApplied(false);
     try {
-      setDraft(
-        (await api("/assistant/draft", "POST", { topic, objectives })).draft,
-      );
+      const res = await api<{ draft: string }>("/assistant/draft", "POST", {
+        topic,
+        objectives,
+      });
+      setDraft(res.draft);
     } catch (e) {
       setError(e.message);
     } finally {

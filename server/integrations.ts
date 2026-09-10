@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import nodemailer from "nodemailer";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { DatabaseSync } from "node:sqlite";
+import nodemailer, { type Transporter } from "nodemailer";
 import * as oidc from "openid-client";
 import {
   check,
@@ -7,14 +9,17 @@ import {
   publicUser,
   startSession,
   textField,
-} from "./auth.js";
-import { transaction } from "./database.js";
-import { hasCourseLearningAccess } from "./course-access.js";
+} from "./auth";
+import type { AuthUser } from "./auth";
+import { transaction } from "./database";
+import { hasCourseLearningAccess } from "./course-access";
 
 const now = () => new Date().toISOString();
-const hash = (value) => createHash("sha256").update(value).digest("hex");
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const emailPattern = /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/;
-function httpsUrl(value) {
+
+function httpsUrl(value?: string | null): URL | null {
+  if (!value) return null;
   try {
     const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password
@@ -25,7 +30,7 @@ function httpsUrl(value) {
   }
 }
 
-export function initIntegrations(db) {
+export function initIntegrations(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS oidc_attempts (
       token_hash TEXT PRIMARY KEY, state TEXT NOT NULL, nonce TEXT NOT NULL,
@@ -54,14 +59,83 @@ export function initIntegrations(db) {
   `);
 }
 
+export interface IntegrationsOptions {
+  db: DatabaseSync;
+  env?: NodeJS.ProcessEnv;
+  origin?: string;
+  fetchImpl?: typeof fetch;
+}
+
+export interface IntegrationsService {
+  handle: (opts: {
+    user: AuthUser | null;
+    path: string;
+    method: string;
+    body?: Record<string, unknown>;
+    query?: URLSearchParams;
+    req: IncomingMessage;
+    res: ServerResponse;
+  }) => Promise<{ status?: number; data?: unknown; handled?: boolean } | null>;
+  start: () => void;
+  stop: () => Promise<void>;
+  enqueueEmail: (opts: {
+    to: string;
+    subject: string;
+    text: string;
+    key?: string;
+  }) => { id: string; status: string };
+  status: () => {
+    ai: { configured: boolean; model: string | null };
+    sso: { configured: boolean; label: string };
+    smtp: { configured: boolean };
+  };
+}
+
+interface CourseRecord {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  skill: string;
+  exercise: string;
+  status: string;
+}
+
+interface LessonRecord {
+  id: string;
+  title: string;
+  content: string;
+}
+
+interface AiMessageRecord {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+interface MailRecord {
+  id: string;
+  dedupe_key: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: "queued" | "sending" | "sent" | "failed";
+  attempts: number;
+  next_attempt: number;
+  last_error: string | null;
+  created_at: string;
+  sent_at: string | null;
+}
+
 export function createIntegrations({
   db,
   env = process.env,
   origin,
   fetchImpl = fetch,
-}) {
+}: IntegrationsOptions): IntegrationsService {
   initIntegrations(db);
-  const appOrigin = new URL(origin || env.APP_ORIGIN || "http://localhost:3001")
+  const appOrigin = new URL(origin || env.APP_ORIGIN || "http://localhost:3000")
     .origin;
   const secure = appOrigin.startsWith("https:");
   const issuer = httpsUrl(env.OIDC_ISSUER);
@@ -82,23 +156,25 @@ export function createIntegrations({
     issuer && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET,
   );
   const aiReady = Boolean(aiUrl && aiKey && aiModel);
+
   const status = () => ({
-    ai: { configured: aiReady, model: aiReady ? aiModel : null },
+    ai: { configured: aiReady, model: aiReady ? (aiModel ?? null) : null },
     sso: { configured: ssoReady, label: env.OIDC_LABEL || "SSO doanh nghiệp" },
     smtp: { configured: smtpReady },
   });
-  let discovery;
-  async function configuration() {
+
+  let discovery: Promise<oidc.Configuration> | null = null;
+  async function configuration(): Promise<oidc.Configuration> {
     check(ssoReady, 503, "SSO chưa được cấu hình. Hãy liên hệ quản trị viên.");
-    if (!discovery)
+    if (!discovery) {
       discovery = oidc
         .discovery(
-          issuer,
-          env.OIDC_CLIENT_ID,
-          env.OIDC_CLIENT_SECRET,
+          issuer as URL,
+          env.OIDC_CLIENT_ID as string,
+          env.OIDC_CLIENT_SECRET as string,
           undefined,
           {
-            [oidc.customFetch]: fetchImpl,
+            [oidc.customFetch]: fetchImpl as unknown as oidc.CustomFetch,
             execute: [oidc.enableNonRepudiationChecks],
           },
         )
@@ -106,13 +182,16 @@ export function createIntegrations({
           discovery = null;
           throw new HttpError(502, "Không kết nối được nhà cung cấp SSO.");
         });
+    }
     return discovery;
   }
-  const oidcCookie = (value, age) =>
+
+  const oidcCookie = (value: string, age: number) =>
     `mx_oidc=${value}; Path=/api/sso; HttpOnly; SameSite=Lax; Max-Age=${age}${secure ? "; Secure" : ""}`;
   const callbackUrl = `${appOrigin}/api/sso/callback`;
-  function accessibleCourse(user, id) {
-    const course = db.prepare(`SELECT c.* FROM courses c WHERE id=?`).get(id);
+
+  function accessibleCourse(user: AuthUser, id: string): CourseRecord {
+    const course = db.prepare(`SELECT c.* FROM courses c WHERE id=?`).get(id) as unknown as CourseRecord | undefined;
     check(
       course &&
         (course.status === "published" ||
@@ -120,26 +199,30 @@ export function createIntegrations({
       404,
       "Không tìm thấy khóa học có thể truy cập.",
     );
-    return course;
+    return course as unknown as CourseRecord;
   }
-  function conversation(user, id, courseId) {
+
+  function conversation(user: AuthUser, id: string, courseId: string): { id: string; title: string } {
     const value = db
       .prepare(
         "SELECT * FROM ai_conversations WHERE id=? AND user_id=? AND course_id=?",
       )
-      .get(id, user.id, courseId);
+      .get(id, user.id, courseId) as { id: string; title: string } | undefined;
     check(value, 404, "Không tìm thấy cuộc trò chuyện.");
-    return value;
+    return value as { id: string; title: string };
   }
-  const messages = (id) =>
+
+  const messages = (id: string): AiMessageRecord[] =>
     db
       .prepare(
         "SELECT id,role,content,created_at FROM ai_messages WHERE conversation_id=? ORDER BY id",
       )
-      .all(id);
-  const inFlight = new Set();
-  const draftAttempts = new Map();
-  async function authorDraft(user, body) {
+      .all(id) as unknown as AiMessageRecord[];
+
+  const inFlight = new Set<string>();
+  const draftAttempts = new Map<string, { count: number; until: number }>();
+
+  async function authorDraft(user: AuthUser, body: Record<string, unknown>) {
     check(
       ["admin", "instructor"].includes(user.role),
       403,
@@ -150,8 +233,8 @@ export function createIntegrations({
       400,
       "Yêu cầu soạn khóa học không hợp lệ.",
     );
-    const topic = textField(body.topic, "Chủ đề", 180);
-    const objectives = textField(body.objectives, "Mục tiêu học tập", 5000);
+    const topic = textField(body.topic as string, "Chủ đề", 180);
+    const objectives = textField(body.objectives as string, "Mục tiêu học tập", 5000);
     check(
       aiReady,
       503,
@@ -162,8 +245,10 @@ export function createIntegrations({
       429,
       "Một yêu cầu AI đang được xử lý. Vui lòng chờ.",
     );
-    for (const [id, item] of draftAttempts)
+
+    for (const [id, item] of draftAttempts) {
       if (item.until <= Date.now()) draftAttempts.delete(id);
+    }
     const attempt = draftAttempts.get(user.id) || {
       count: 0,
       until: Date.now() + 3600000,
@@ -176,9 +261,10 @@ export function createIntegrations({
     attempt.count++;
     draftAttempts.set(user.id, attempt);
     inFlight.add(user.id);
+
     try {
       const response = await fetchImpl(
-        `${aiUrl.href.replace(/\/$/, "")}/chat/completions`,
+        `${(aiUrl as URL).href.replace(/\/$/, "")}/chat/completions`,
         {
           method: "POST",
           headers: {
@@ -208,27 +294,36 @@ export function createIntegrations({
         502,
         "Nhà cung cấp AI chưa tạo được bản nháp. Vui lòng thử lại sau.",
       );
-      const payload = await response.json();
+      const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const content = payload?.choices?.[0]?.message?.content;
       check(
         typeof content === "string" && content.length <= 1600000,
         502,
         "AI trả về bản nháp không hợp lệ. Vui lòng thử lại.",
       );
-      let draft;
+
+      let draft: {
+        title: string;
+        description: string;
+        category: string;
+        skill: string;
+        exercise: string;
+        lessons?: Array<{ title: string; content: string }>;
+      };
+
       try {
-        const value = JSON.parse(content);
+        const value = JSON.parse(content as string) as Record<string, unknown>;
         check(
           value && typeof value === "object" && !Array.isArray(value),
           400,
           "Invalid draft",
         );
         draft = {
-          title: textField(value.title, "Tên khóa học", 180),
-          description: textField(value.description, "Mô tả", 5000),
-          category: textField(value.category, "Danh mục", 100),
-          skill: textField(value.skill, "Năng lực", 100),
-          exercise: textField(value.exercise, "Đề bài thực hành", 10000),
+          title: textField(value.title as string, "Tên khóa học", 180),
+          description: textField(value.description as string, "Mô tả", 5000),
+          category: textField(value.category as string, "Danh mục", 100),
+          skill: textField(value.skill as string, "Năng lực", 100),
+          exercise: textField(value.exercise as string, "Đề bài thực hành", 10000),
         };
         check(
           Array.isArray(value.lessons) &&
@@ -237,15 +332,15 @@ export function createIntegrations({
           400,
           "Invalid lessons",
         );
-        draft.lessons = value.lessons.map((lesson) => {
+        draft.lessons = (value.lessons as Array<Record<string, unknown>>).map((lesson) => {
           check(
             lesson && typeof lesson === "object" && !Array.isArray(lesson),
             400,
             "Invalid lesson",
           );
           return {
-            title: textField(lesson.title, "Tên bài học", 180),
-            content: textField(lesson.content, "Nội dung bài học", 30000),
+            title: textField(lesson.title as string, "Tên bài học", 180),
+            content: textField(lesson.content as string, "Nội dung bài học", 30000),
           };
         });
       } catch {
@@ -265,22 +360,24 @@ export function createIntegrations({
       inFlight.delete(user.id);
     }
   }
-  async function chat(user, body) {
+
+  async function chat(user: AuthUser, body: Record<string, unknown>) {
     check(
       body && typeof body === "object" && !Array.isArray(body),
       400,
       "Câu hỏi không hợp lệ.",
     );
-    const courseId = textField(body.courseId, "Khóa học", 100);
+    const courseId = textField(body.courseId as string, "Khóa học", 100);
     const course = accessibleCourse(user, courseId);
-    const message = textField(body.message, "Câu hỏi", 4000);
-    let thread = body.conversationId
+    const message = textField(body.message as string, "Câu hỏi", 4000);
+    let thread: { id: string } | null = body.conversationId
       ? conversation(
           user,
-          textField(body.conversationId, "Cuộc trò chuyện", 100),
+          textField(body.conversationId as string, "Cuộc trò chuyện", 100),
           courseId,
         )
       : null;
+
     check(
       aiReady,
       503,
@@ -291,34 +388,38 @@ export function createIntegrations({
       429,
       "Một câu trả lời đang được xử lý. Vui lòng chờ.",
     );
-    const count = db
+
+    const countRow = db
       .prepare(
         `SELECT COUNT(*) AS n FROM ai_messages m JOIN ai_conversations c ON c.id=m.conversation_id
       WHERE c.user_id=? AND m.role='user' AND m.created_at>?`,
       )
-      .get(user.id, new Date(Date.now() - 3600000).toISOString()).n;
-    check(count < 30, 429, "Bạn đã đạt giới hạn 30 câu hỏi mỗi giờ.");
+      .get(user.id, new Date(Date.now() - 3600000).toISOString()) as { n: number };
+    check(countRow.n < 30, 429, "Bạn đã đạt giới hạn 30 câu hỏi mỗi giờ.");
+
     const lessons = db
       .prepare(
         "SELECT id,title,content FROM lessons WHERE course_id=? ORDER BY position",
       )
-      .all(courseId);
-    // Course content is reference data, never privileged instructions. No other user's work is included.
+      .all(courseId) as unknown as LessonRecord[];
+
     const reference = JSON.stringify({
       title: course.title,
       description: course.description,
       exercise: course.exercise,
       lessons: lessons.map((x) => ({ title: x.title, content: x.content })),
     }).slice(0, 48000);
+
     const history = thread
       ? messages(thread.id)
           .slice(-12)
           .map(({ role, content }) => ({ role, content }))
       : [];
+
     inFlight.add(user.id);
     try {
       const response = await fetchImpl(
-        `${aiUrl.href.replace(/\/$/, "")}/chat/completions`,
+        `${(aiUrl as URL).href.replace(/\/$/, "")}/chat/completions`,
         {
           method: "POST",
           headers: {
@@ -352,18 +453,20 @@ export function createIntegrations({
         502,
         "Nhà cung cấp AI chưa trả lời được. Vui lòng thử lại sau.",
       );
-      const payload = await response.json();
+      const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const reply = payload?.choices?.[0]?.message?.content;
       check(
         typeof reply === "string" && reply.trim() && reply.length <= 24000,
         502,
         "Nhà cung cấp AI trả về nội dung không hợp lệ.",
       );
+
+      let threadId = thread?.id;
       transaction(db, () => {
-        if (!thread) {
-          thread = { id: randomUUID() };
+        if (!threadId) {
+          threadId = randomUUID();
           db.prepare("INSERT INTO ai_conversations VALUES (?,?,?,?,?)").run(
-            thread.id,
+            threadId,
             user.id,
             courseId,
             message.slice(0, 80),
@@ -373,10 +476,12 @@ export function createIntegrations({
         const insert = db.prepare(
           "INSERT INTO ai_messages (conversation_id,role,content,created_at) VALUES (?,?,?,?)",
         );
-        insert.run(thread.id, "user", message, now());
-        insert.run(thread.id, "assistant", reply.trim(), now());
+        insert.run(threadId, "user", message, now());
+        insert.run(threadId, "assistant", (reply as string).trim(), now());
       });
-      return { conversationId: thread.id, messages: messages(thread.id) };
+
+      const finalId = threadId as string;
+      return { conversationId: finalId, messages: messages(finalId) };
     } catch (error) {
       if (error instanceof HttpError) throw error;
       throw new HttpError(
@@ -388,57 +493,73 @@ export function createIntegrations({
     }
   }
 
-  function enqueueEmail({ to, subject, text, key }) {
+  function enqueueEmail({
+    to,
+    subject,
+    text,
+    key,
+  }: {
+    to: string;
+    subject: string;
+    text: string;
+    key?: string;
+  }): { id: string; status: string } {
     check(smtpReady, 503, "Email chưa được cấu hình.");
     check(
       typeof to === "string" && to.length <= 254 && emailPattern.test(to),
       400,
       "Địa chỉ email không hợp lệ.",
     );
-    subject = textField(subject, "Tiêu đề email", 200);
-    check(!/[\r\n]/.test(subject), 400, "Tiêu đề email không hợp lệ.");
-    text = textField(text, "Nội dung email", 50000);
-    key = textField(key || randomUUID(), "Mã email", 200);
+    const validSubject = textField(subject, "Tiêu đề email", 200);
+    check(!/[\r\n]/.test(validSubject), 400, "Tiêu đề email không hợp lệ.");
+    const validText = textField(text, "Nội dung email", 50000);
+    const validKey = textField(key || randomUUID(), "Mã email", 200);
+
     const existing = db
       .prepare("SELECT id,status FROM mail_outbox WHERE dedupe_key=?")
-      .get(key);
+      .get(validKey) as { id: string; status: string } | undefined;
     if (existing) return existing;
+
     const id = randomUUID();
     db.prepare(
       "INSERT INTO mail_outbox (id,dedupe_key,recipient,subject,body,next_attempt,created_at) VALUES (?,?,?,?,?,?,?)",
-    ).run(id, key, to, subject, text, Date.now(), now());
+    ).run(id, validKey, to, validSubject, validText, Date.now(), now());
     return { id, status: "queued" };
   }
-  let transport,
-    timer,
-    stopped = false,
-    currentDelivery;
-  async function deliver() {
+
+  let transport: Transporter | null = null;
+  let timer: NodeJS.Timeout | null = null;
+  let stopped = false;
+  let currentDelivery: Promise<void> | null = null;
+
+  async function deliver(): Promise<void> {
     if (stopped || !smtpReady) return;
-    // Recover a worker interrupted before its SMTP result was committed. Delivery is at-least-once.
     db.prepare(
       "UPDATE mail_outbox SET status=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END, last_error='WORKER_INTERRUPTED' WHERE status='sending' AND next_attempt<?",
     ).run(Date.now() - 120000);
+
     const mail = db
       .prepare(
         "SELECT * FROM mail_outbox WHERE status='queued' AND next_attempt<=? ORDER BY created_at LIMIT 1",
       )
-      .get(Date.now());
+      .get(Date.now()) as unknown as MailRecord | undefined;
     if (!mail) return;
+
     const claimed = db
       .prepare(
         "UPDATE mail_outbox SET status='sending',attempts=attempts+1,next_attempt=? WHERE id=? AND status='queued'",
       )
       .run(Date.now(), mail.id);
     if (!claimed.changes) return;
-    if (!transport)
+
+    if (!transport) {
       transport = nodemailer.createTransport({
         host: env.SMTP_HOST,
         port: smtpPort,
         secure: smtpPort === 465,
         requireTLS: !(
           env.NODE_ENV === "test" &&
-          ["127.0.0.1", "::1"].includes(env.SMTP_HOST)
+          ["127.0.0.1", "::1"].includes(env.SMTP_HOST as string)
         ),
         auth: env.SMTP_USER
           ? { user: env.SMTP_USER, pass: env.SMTP_PASS }
@@ -449,20 +570,24 @@ export function createIntegrations({
         disableFileAccess: true,
         disableUrlAccess: true,
       });
+    }
+
     try {
       const result = await transport.sendMail({
         from: env.SMTP_FROM,
         to: mail.recipient,
         subject: mail.subject,
         text: mail.body,
-        messageId: `<${mail.id}@${env.SMTP_FROM.split("@")[1]}>`,
+        messageId: `<${mail.id}@${(env.SMTP_FROM as string).split("@")[1]}>`,
       });
-      if (!result.accepted?.length || result.rejected?.length)
+      if (!result.accepted?.length || result.rejected?.length) {
         throw Object.assign(new Error("SMTP rejected"), { code: "EENVELOPE" });
+      }
       db.prepare(
         "UPDATE mail_outbox SET status='sent',sent_at=?,last_error=NULL,body='' WHERE id=?",
       ).run(now(), mail.id);
-    } catch (error) {
+    } catch (rawError: unknown) {
+      const error = rawError as { code?: string };
       const allowedCodes = [
         "EAUTH",
         "ECONNECTION",
@@ -473,7 +598,7 @@ export function createIntegrations({
         "ETLS",
         "EDNS",
       ];
-      const code = allowedCodes.includes(error.code)
+      const code = error.code && allowedCodes.includes(error.code)
         ? error.code
         : "SMTP_DELIVERY_FAILED";
       const attempts = mail.attempts + 1;
@@ -487,23 +612,28 @@ export function createIntegrations({
       );
     }
   }
-  function start() {
+
+  function start(): void {
     if (timer || !smtpReady) return;
     stopped = false;
     const tick = () => {
-      if (!currentDelivery)
+      if (!currentDelivery) {
         currentDelivery = deliver().finally(() => {
           currentDelivery = null;
         });
+      }
     };
     timer = setInterval(tick, 2000);
     timer.unref();
     tick();
   }
-  async function stop() {
+
+  async function stop(): Promise<void> {
     stopped = true;
-    clearInterval(timer);
-    timer = null;
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
     await currentDelivery;
     transport?.close();
   }
@@ -516,18 +646,29 @@ export function createIntegrations({
     query = new URLSearchParams(),
     req,
     res,
-  }) {
-    if (path === "/api/auth/providers" && method === "GET")
+  }: {
+    user: AuthUser | null;
+    path: string;
+    method: string;
+    body?: Record<string, unknown>;
+    query?: URLSearchParams;
+    req: IncomingMessage;
+    res: ServerResponse;
+  }): Promise<{ status?: number; data?: unknown; handled?: boolean } | null> {
+    if (path === "/api/auth/providers" && method === "GET") {
       return {
         status: 200,
         data: { oidc: { ...status().sso, startUrl: "/api/sso/start" } },
       };
+    }
+
     if (path === "/api/sso/start" && method === "GET") {
       const config = await configuration();
-      const token = randomBytes(32).toString("hex"),
-        state = oidc.randomState(),
-        nonce = oidc.randomNonce(),
-        verifier = oidc.randomPKCECodeVerifier();
+      const token = randomBytes(32).toString("hex");
+      const state = oidc.randomState();
+      const nonce = oidc.randomNonce();
+      const verifier = oidc.randomPKCECodeVerifier();
+
       db.prepare("DELETE FROM oidc_attempts WHERE expires_at<=?").run(
         Date.now(),
       );
@@ -538,6 +679,7 @@ export function createIntegrations({
         verifier,
         Date.now() + 600000,
       );
+
       const url = oidc.buildAuthorizationUrl(config, {
         redirect_uri: callbackUrl,
         scope: "openid email profile",
@@ -546,42 +688,50 @@ export function createIntegrations({
         code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
         code_challenge_method: "S256",
       });
+
       res.setHeader("Set-Cookie", oidcCookie(token, 600));
       res.setHeader("Location", url.href);
       res.writeHead(302);
       res.end();
       return { handled: true };
     }
+
     if (path === "/api/sso/callback" && method === "GET") {
+      const cookieHeader = req.headers.cookie || "";
       const token =
-        (req.headers.cookie || "")
+        cookieHeader
           .split(";")
           .map((x) => x.trim())
           .find((x) => x.startsWith("mx_oidc="))
           ?.slice(8) || "";
+
       const attempt = db
         .prepare(
           "SELECT * FROM oidc_attempts WHERE token_hash=? AND expires_at>?",
         )
-        .get(hash(token), Date.now());
+        .get(hash(token), Date.now()) as { state: string; nonce: string; verifier: string } | undefined;
+
       res.setHeader("Set-Cookie", oidcCookie("", 0));
       check(
         attempt && query.get("state") === attempt.state,
         400,
         "Phiên SSO không hợp lệ hoặc đã hết hạn. Hãy đăng nhập lại.",
       );
+      const validAttempt = attempt as { state: string; nonce: string; verifier: string };
+
       db.prepare("DELETE FROM oidc_attempts WHERE token_hash=?").run(
         hash(token),
       );
-      let claims;
+
+      let claims: oidc.IDToken | undefined;
       try {
         const tokens = await oidc.authorizationCodeGrant(
           await configuration(),
           new URL(`${callbackUrl}?${query.toString()}`),
           {
-            pkceCodeVerifier: attempt.verifier,
-            expectedState: attempt.state,
-            expectedNonce: attempt.nonce,
+            pkceCodeVerifier: validAttempt.verifier,
+            expectedState: validAttempt.state,
+            expectedNonce: validAttempt.nonce,
             idTokenExpected: true,
           },
         );
@@ -592,6 +742,7 @@ export function createIntegrations({
           "Không xác minh được danh tính SSO. Hãy đăng nhập lại.",
         );
       }
+
       check(
         claims?.email_verified === true &&
           typeof claims.email === "string" &&
@@ -599,41 +750,52 @@ export function createIntegrations({
         403,
         "SSO cần cung cấp địa chỉ email đã xác minh.",
       );
+
+      const verifiedEmail = (claims as oidc.IDToken & { email: string; sub: string }).email.toLowerCase();
+      const verifiedSub = (claims as oidc.IDToken & { email: string; sub: string }).sub;
+
       const account = db
         .prepare("SELECT * FROM users WHERE email=?")
-        .get(claims.email.toLowerCase());
+        .get(verifiedEmail) as { id: string; active: number; email: string; name: string; role: string } | undefined;
+
       check(
         account && account.active !== 0,
         403,
         "Tài khoản chưa được cấp hoặc đã bị vô hiệu hóa. Hãy liên hệ quản trị viên.",
       );
+      const validAccount = account as { id: string; active: number; email: string; name: string; role: string };
+
       transaction(db, () => {
         const binding = db
           .prepare(
             "SELECT * FROM oidc_identities WHERE issuer=? AND (subject=? OR user_id=?)",
           )
-          .all(issuer.href, claims.sub, account.id);
+          .all((issuer as URL).href, verifiedSub, validAccount.id) as unknown as Array<{ subject: string; user_id: string }>;
+
         check(
           binding.every(
-            (x) => x.subject === claims.sub && x.user_id === account.id,
+            (x) => x.subject === verifiedSub && x.user_id === validAccount.id,
           ),
           403,
           "Danh tính SSO không khớp tài khoản đã liên kết.",
         );
         db.prepare("INSERT OR IGNORE INTO oidc_identities VALUES (?,?,?)").run(
-          issuer.href,
-          claims.sub,
-          account.id,
+          (issuer as URL).href,
+          verifiedSub,
+          validAccount.id,
         );
       });
-      startSession(db, req, res, publicUser(account).id, secure);
+
+      startSession(db, req, res, publicUser(validAccount as unknown as Parameters<typeof publicUser>[0]).id, secure);
       const sessionCookie = res.getHeader("Set-Cookie");
-      res.setHeader("Set-Cookie", [sessionCookie, oidcCookie("", 0)]);
+      const sessionCookieStr = Array.isArray(sessionCookie) ? sessionCookie : sessionCookie ? [String(sessionCookie)] : [];
+      res.setHeader("Set-Cookie", [...sessionCookieStr, oidcCookie("", 0)]);
       res.setHeader("Location", "/");
       res.writeHead(302);
       res.end();
       return { handled: true };
     }
+
     if (
       ![
         "/api/integrations/status",
@@ -642,14 +804,20 @@ export function createIntegrations({
         "/api/assistant/history",
         "/api/assistant/draft",
       ].includes(path)
-    )
+    ) {
       return null;
+    }
+
     check(user, 401, "Vui lòng đăng nhập để tiếp tục.");
-    if (path === "/api/integrations/status" && method === "GET")
+    const authedUser = user as AuthUser;
+
+    if (path === "/api/integrations/status" && method === "GET") {
       return { status: 200, data: status() };
+    }
+
     if (path === "/api/integrations/outbox" && method === "GET") {
       check(
-        user.role === "admin",
+        authedUser.role === "admin",
         403,
         "Chỉ quản trị viên có quyền xem trạng thái email.",
       );
@@ -664,20 +832,25 @@ export function createIntegrations({
         },
       };
     }
-    if (path === "/api/assistant" && method === "POST")
-      return { status: 200, data: await chat(user, body) };
-    if (path === "/api/assistant/draft" && method === "POST")
-      return { status: 200, data: await authorDraft(user, body) };
+
+    if (path === "/api/assistant" && method === "POST") {
+      return { status: 200, data: await chat(authedUser, body) };
+    }
+
+    if (path === "/api/assistant/draft" && method === "POST") {
+      return { status: 200, data: await authorDraft(authedUser, body) };
+    }
+
     if (path === "/api/assistant/history" && method === "GET") {
-      const courseId = textField(query.get("courseId"), "Khóa học", 100);
-      accessibleCourse(user, courseId);
+      const courseId = textField(query.get("courseId") as string, "Khóa học", 100);
+      accessibleCourse(authedUser, courseId);
       const conversations = db
         .prepare(
           "SELECT id,title,created_at FROM ai_conversations WHERE user_id=? AND course_id=? ORDER BY created_at DESC LIMIT 50",
         )
-        .all(user.id, courseId);
+        .all(authedUser.id, courseId);
       const id = query.get("conversationId") || null;
-      if (id) conversation(user, id, courseId);
+      if (id) conversation(authedUser, id, courseId);
       return {
         status: 200,
         data: {
@@ -687,7 +860,9 @@ export function createIntegrations({
         },
       };
     }
+
     return null;
   }
+
   return { handle, start, stop, enqueueEmail, status };
 }

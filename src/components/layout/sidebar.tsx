@@ -1,10 +1,12 @@
 import { Icon } from "@/components/ui";
 import { roleLabels } from "@/lib/formatters";
 
+import type { LiveUser } from "@/types";
+
 export interface SidebarProps {
   nav: Array<[string, string, string] | string[]>;
   active: string;
-  user: any;
+  user: LiveUser;
   unreadNotifications: number;
   busy: boolean;
   onGo: (key: string) => void;

@@ -130,9 +130,23 @@ function Dashboard({ state, go }) {
   );
 }
 
+import type { ReactNode } from "react";
+import type { AppState, LiveUser } from "@/types";
+
+interface SessionData {
+  user: LiveUser | null;
+  setupRequired: boolean;
+}
+
+export interface LiveAppState extends AppState {
+  user: LiveUser;
+  unreadNotifications: number;
+  [key: string]: any;
+}
+
 export default function LiveApp() {
-  const [session, setSession] = useState<any>(null);
-  const [state, setState] = useState<any>(null);
+  const [session, setSession] = useState<SessionData | null>(null);
+  const [state, setState] = useState<LiveAppState | null>(null);
   const [route, setRoute] = useState(
     () =>
       (typeof location !== "undefined" ? location.hash.slice(1) : "") || "home",
@@ -143,19 +157,19 @@ export default function LiveApp() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const reload = useCallback(async () => {
-    const data = await api("/state");
+    const data = await api<LiveAppState>("/state");
     setState(data);
   }, []);
   const boot = useCallback(async () => {
     setError("");
     try {
-      const current = await api("/session");
+      const current = await api<SessionData>("/session");
       setSession(current);
       if (current.user) await reload();
       else setState(null);
       setSession(current);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     }
   }, [reload]);
   useEffect(() => {
@@ -195,16 +209,18 @@ export default function LiveApp() {
       setNotice(success);
       try {
         await reload();
-      } catch (error: any) {
+      } catch (err: unknown) {
         setError(
           "Đã lưu trên máy chủ, nhưng chưa tải được dữ liệu mới. Hãy nhấn Tải lại dữ liệu.",
         );
-        if (error.status === 401) setReauth(true);
+        const statusErr = err as { status?: number };
+        if (statusErr.status === 401) setReauth(true);
       }
       return result;
-    } catch (error: any) {
-      setError(error.message);
-      if (error.status === 401) {
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      const statusErr = err as { status?: number };
+      if (statusErr.status === 401) {
         setReauth(true);
       }
       return null;
@@ -223,8 +239,8 @@ export default function LiveApp() {
       setError("");
       setNotice("");
       go("home");
-    } catch (error: any) {
-      setError(error.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }
@@ -292,7 +308,7 @@ export default function LiveApp() {
       </div>
     );
   const props = { state, go, mutate, busy, refresh: reload };
-  let page: any = null;
+  let page: ReactNode = null;
   switch (active) {
     case "home":
       page = <Dashboard {...props} />;
@@ -401,9 +417,10 @@ export default function LiveApp() {
               try {
                 await reload();
                 setError("");
-              } catch (e: any) {
-                setError(e.message);
-                if (e.status === 401) setReauth(true);
+              } catch (e: unknown) {
+                setError(e instanceof Error ? e.message : "Có lỗi xảy ra");
+                const statusErr = e as { status?: number };
+                if (statusErr.status === 401) setReauth(true);
               }
             }}
           />
@@ -439,7 +456,7 @@ export default function LiveApp() {
           resumeUser={state.user}
           setup={false}
           onLogin={async () => {
-            const data = await api("/state");
+            const data = await api<LiveAppState>("/state");
             if (data.user.id !== state.user.id)
               throw new Error(
                 "Tài khoản đã thay đổi. Hãy đăng nhập lại tài khoản đang soạn bài.",

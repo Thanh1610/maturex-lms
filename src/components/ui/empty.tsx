@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { Button } from "./button";
 import { Icon } from "./icon";
 
@@ -10,14 +10,13 @@ export function Empty({
   onClick,
   className = "",
   ...props
-}: {
+}: HTMLAttributes<HTMLDivElement> & {
   title?: string;
   description?: string;
   children?: ReactNode;
   action?: string;
   onClick?: () => void;
   className?: string;
-  [key: string]: any;
 }) {
   return (
     <div

@@ -3,19 +3,32 @@ import { Badge, Button, Empty, Icon } from "@/components/ui";
 import { api } from "@/lib/api-client";
 import { dateLabel } from "@/lib/formatters";
 
-function useSocial(path: string, _state: any, mutate: any) {
-  const [data, setData] = useState<any>(null);
+import type { AppState } from "@/types";
+
+function useSocial<T = any>(
+  path: string,
+  _state: AppState,
+  mutate: (
+    path: string,
+    method?: string,
+    body?: unknown,
+    message?: string,
+  ) => Promise<unknown>,
+) {
+  const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
   const sequence = useRef(0);
   const reload = useCallback(async () => {
     const request = ++sequence.current;
     setError("");
     try {
-      const next = await api(path);
+      const next = await api<T>(path);
       if (request === sequence.current) setData(next);
       return next;
-    } catch (error: any) {
-      if (request === sequence.current) setError(error.message);
+    } catch (err: unknown) {
+      if (request === sequence.current) {
+        setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
+      }
       return null;
     }
   }, [path]);
@@ -28,7 +41,7 @@ function useSocial(path: string, _state: any, mutate: any) {
   const change = async (
     path: string,
     method: string,
-    body: any,
+    body: unknown,
     message?: string,
   ) => {
     const saved = await mutate(path, method, body, message);
@@ -37,32 +50,33 @@ function useSocial(path: string, _state: any, mutate: any) {
   };
   return { data, error, reload, change, setError };
 }
-function LoadState({ resource }: { resource: any }) {
+
+function LoadState({
+  resource,
+}: {
+  resource: { error: string; data: unknown; reload: () => void };
+}) {
   if (resource.error)
     return (
       <div className="live-error" role="alert">
-        {resource.error}{" "}
-        <Button kind="ghost" onClick={resource.reload}>
+        {resource.error}
+        <Button type="button" kind="ghost" onClick={resource.reload}>
           Thử lại
         </Button>
       </div>
     );
-  if (!resource.data)
-    return (
-      <p role="status" className="muted">
-        Đang tải dữ liệu…
-      </p>
-    );
+  if (!resource.data) return <p role="status">Đang tải dữ liệu…</p>;
   return null;
 }
-const localDate = (value: any) => {
+
+const localDate = (value: string | number | Date | null | undefined) => {
   if (!value) return "";
   const date = new Date(value);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
 };
-function EventEditor({ initial, busy, change, onClose }) {
+function EventEditor({ initial, busy, change, onClose }: any) {
   const [form, setForm] = useState(() =>
     initial
       ? {
@@ -80,9 +94,9 @@ function EventEditor({ initial, busy, change, onClose }) {
         },
   );
   const [error, setError] = useState("");
-  const set = (field, value) =>
-    setForm((previous) => ({ ...previous, [field]: value }));
-  async function save(event) {
+  const set = (field: string, value: unknown) =>
+    setForm((previous: any) => ({ ...previous, [field]: value }));
+  async function save(event: any) {
     event.preventDefault();
     setError("");
     const starts = Date.parse(form.starts_at),
@@ -145,16 +159,17 @@ function EventEditor({ initial, busy, change, onClose }) {
         />
       </label>
       <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-        Địa điểm hoặc liên kết tham gia
+        Địa điểm hoặc liên kết lớp học trực tuyến
         <input
           className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
           required
-          maxLength={1000}
+          maxLength={500}
           value={form.location}
           onChange={(e) => set("location", e.target.value)}
+          placeholder="Phòng 302 hoặc https://meet.google.com/..."
         />
       </label>
-      <div className="live-two-col grid grid-cols-2 max-[760px]:grid-cols-1 gap-[18px]">
+      <div className="live-grid grid grid-cols-2 max-sm:grid-cols-1 gap-[18px]">
         <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
           Bắt đầu
           <input
@@ -208,7 +223,8 @@ function EventEditor({ initial, busy, change, onClose }) {
     </form>
   );
 }
-function Location({ value }) {
+function Location({ value }: { value?: string | null }) {
+  if (!value) return <span>—</span>;
   try {
     const url = new URL(value);
     if (["http:", "https:"].includes(url.protocol))
@@ -227,34 +243,65 @@ function Location({ value }) {
   }
   return <span>{value}</span>;
 }
+export interface SocialEvent {
+  id: string;
+  owner_id: string;
+  owner_name?: string;
+  title: string;
+  description: string;
+  course_id?: string | null;
+  location?: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number;
+  status: string;
+  version: number;
+  created_at: string;
+  enrolled?: boolean;
+  attendance?: string;
+  attendee_count?: number;
+  attendees?: Array<{ user_id: string; name: string; attendance?: string }>;
+}
+
 export function Calendar({
   state,
   mutate,
   busy,
 }: {
-  state: any;
-  mutate: any;
+  state: AppState & { user: { id: string; role: string } };
+  mutate: (
+    path: string,
+    method?: string,
+    body?: unknown,
+    message?: string,
+  ) => Promise<unknown>;
   busy: boolean;
 }) {
-  const resource = useSocial("/events", state, mutate);
-  const [editor, setEditor] = useState<any>(null);
+  const resource = useSocial<{ events: SocialEvent[] }>(
+    "/events",
+    state,
+    mutate,
+  );
+  const [editor, setEditor] = useState<SocialEvent | "new" | null>(null);
   const [filter, setFilter] = useState("upcoming");
-  const [cancel, setCancel] = useState<any>(null);
+  const [cancel, setCancel] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const canCreate = ["admin", "instructor"].includes(state.user.role);
   const items = (resource.data?.events || []).filter(
-    (event: any) =>
+    (event: SocialEvent) =>
       filter === "all" ||
       (filter === "mine"
         ? event.enrolled
         : event.status === "scheduled" &&
           Date.parse(event.ends_at) > Date.now()),
   );
-  async function download(event: any) {
+  async function download(event: SocialEvent) {
     setDownloading(true);
     resource.setError("");
     try {
-      const data = await api(`/events/${event.id}/ics`);
+      const data = await api<{ ics: string; fileName: string }>(
+        `/events/${event.id}/ics`,
+      );
       const url = URL.createObjectURL(
         new Blob([data.ics], { type: "text/calendar;charset=utf-8" }),
       );
@@ -265,8 +312,10 @@ export function Calendar({
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error: any) {
-      resource.setError(error.message);
+    } catch (error: unknown) {
+      resource.setError(
+        error instanceof Error ? error.message : "Có lỗi xảy ra",
+      );
     } finally {
       setDownloading(false);
     }
@@ -289,7 +338,7 @@ export function Calendar({
           <Button
             icon="Plus"
             disabled={busy || !!editor}
-            onClick={() => setEditor({})}
+            onClick={() => setEditor({} as any)}
           >
             Tạo lịch học
           </Button>
@@ -297,8 +346,8 @@ export function Calendar({
       </div>
       {editor && (
         <EventEditor
-          key={editor.id || "new"}
-          initial={editor.id ? editor : null}
+          key={(editor as SocialEvent).id || "new"}
+          initial={(editor as SocialEvent).id ? editor : null}
           change={resource.change}
           busy={busy}
           onClose={() => setEditor(null)}

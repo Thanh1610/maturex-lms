@@ -1,7 +1,7 @@
-import { check } from "./auth.js";
-import { transaction } from "./database.js";
+import { check, type PublicUser } from "./auth";
+import { type AppDatabase, transaction } from "./database";
 
-export function hasTable(db, name) {
+export function hasTable(db: AppDatabase, name: string): boolean {
   return Boolean(
     db
       .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?")
@@ -9,7 +9,7 @@ export function hasTable(db, name) {
   );
 }
 
-export function initCourseTeams(db) {
+export function initCourseTeams(db: AppDatabase): void {
   db.exec(`CREATE TABLE IF NOT EXISTS course_instructors (
     course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     user_id TEXT NOT NULL REFERENCES users(id), PRIMARY KEY(course_id,user_id)
@@ -23,29 +23,35 @@ export function initCourseTeams(db) {
   ); INSERT OR IGNORE INTO course_revisions SELECT id,0 FROM courses;`);
 }
 
-export function courseVersion(db, id) {
-  return hasTable(db, "course_revisions")
-    ? (db
-        .prepare("SELECT version FROM course_revisions WHERE course_id=?")
-        .get(id)?.version ?? 0)
-    : 0;
+export function courseVersion(db: AppDatabase, id: string): number {
+  if (!hasTable(db, "course_revisions")) return 0;
+  const row = db
+    .prepare("SELECT version FROM course_revisions WHERE course_id=?")
+    .get(id) as { version?: number } | undefined;
+  return row?.version ?? 0;
 }
 
-export function activeAccount(db, user) {
+export function activeAccount(
+  db: AppDatabase,
+  user?: { id?: string },
+): { id: string; role: string; active: number } | null {
   if (!user?.id) return null;
-  return (
-    db
-      .prepare("SELECT id,role,active FROM users WHERE id=? AND active=1")
-      .get(user.id) || null
-  );
+  const row = db
+    .prepare("SELECT id,role,active FROM users WHERE id=? AND active=1")
+    .get(user.id) as { id: string; role: string; active: number } | undefined;
+  return row || null;
 }
 
-export function isCourseInstructor(db, user, courseId) {
+export function isCourseInstructor(
+  db: AppDatabase,
+  user: { id: string; role?: string },
+  courseId: string,
+): boolean {
   const account = activeAccount(db, user);
   if (!account || !["admin", "instructor"].includes(account.role)) return false;
   const course = db
     .prepare("SELECT owner_id FROM courses WHERE id=?")
-    .get(courseId);
+    .get(courseId) as { owner_id: string } | undefined;
   if (!course) return false;
   return (
     account.role === "admin" ||
@@ -61,7 +67,11 @@ export function isCourseInstructor(db, user, courseId) {
   );
 }
 
-export function hasCourseLearningAccess(db, user, courseId) {
+export function hasCourseLearningAccess(
+  db: AppDatabase,
+  user: { id: string; role?: string },
+  courseId: string,
+): boolean {
   const account = activeAccount(db, user);
   if (!account) return false;
   if (isCourseInstructor(db, account, courseId)) return true;
@@ -83,30 +93,60 @@ export function hasCourseLearningAccess(db, user, courseId) {
   );
 }
 
-export function listCourseInstructors(db, courseId) {
+export interface CourseInstructor {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_owner: boolean;
+}
+
+export function listCourseInstructors(
+  db: AppDatabase,
+  courseId: string,
+): CourseInstructor[] {
   const course = db
     .prepare("SELECT owner_id FROM courses WHERE id=?")
-    .get(courseId);
+    .get(courseId) as { owner_id: string } | undefined;
   if (!course) return [];
-  const ids = new Set([course.owner_id]);
-  if (hasTable(db, "course_instructors"))
-    for (const row of db
+  const ids = new Set<string>([course.owner_id]);
+  if (hasTable(db, "course_instructors")) {
+    const rows = db
       .prepare("SELECT user_id FROM course_instructors WHERE course_id=?")
-      .all(courseId))
+      .all(courseId) as Array<{ user_id: string }>;
+    for (const row of rows) {
       ids.add(row.user_id);
-  return db
+    }
+  }
+  const users = db
     .prepare(
       "SELECT id,name,email,role FROM users WHERE active=1 AND role IN ('instructor','admin') ORDER BY name",
     )
-    .all()
+    .all() as Array<{ id: string; name: string; email: string; role: string }>;
+
+  return users
     .filter((row) => ids.has(row.id))
     .map((row) => ({ ...row, is_owner: row.id === course.owner_id }));
 }
 
-export function handleCourseTeams({ db, user, path, method, body = {} }) {
+export function handleCourseTeams({
+  db,
+  user,
+  path,
+  method,
+  body = {},
+}: {
+  db: AppDatabase;
+  user: PublicUser;
+  path: string;
+  method: string;
+  body?: Record<string, unknown>;
+}): { status: number; data: Record<string, unknown> } | null {
   const match = path.match(/^\/api\/courses\/([^/]+)\/instructors$/);
   if (!match || !["GET", "PUT"].includes(method)) return null;
-  const course = db.prepare("SELECT * FROM courses WHERE id=?").get(match[1]);
+  const course = db.prepare("SELECT * FROM courses WHERE id=?").get(match[1]) as
+    | { id: string; owner_id: string; status: string }
+    | undefined;
   const account = activeAccount(db, user);
   check(
     course &&
@@ -125,16 +165,17 @@ export function handleCourseTeams({ db, user, path, method, body = {} }) {
       403,
       "Chỉ giảng viên chính hoặc quản trị viên được phân công giảng viên.",
     );
+    const instructorIds = body.instructor_ids;
     check(
-      Array.isArray(body.instructor_ids) &&
-        body.instructor_ids.length <= 100 &&
-        body.instructor_ids.every((id) => typeof id === "string"),
+      Array.isArray(instructorIds) &&
+        instructorIds.length <= 100 &&
+        instructorIds.every((id) => typeof id === "string"),
       400,
       "Danh sách giảng viên không hợp lệ.",
     );
     transaction(db, () => {
-      const ids = [...new Set(body.instructor_ids)];
-      for (const id of ids)
+      const ids = [...new Set(instructorIds as string[])];
+      for (const id of ids) {
         check(
           db
             .prepare(
@@ -150,6 +191,7 @@ export function handleCourseTeams({ db, user, path, method, body = {} }) {
           400,
           "Giảng viên phải đang hoạt động.",
         );
+      }
       db.prepare("DELETE FROM course_instructors WHERE course_id=?").run(
         course.id,
       );
@@ -157,7 +199,9 @@ export function handleCourseTeams({ db, user, path, method, body = {} }) {
         "INSERT OR IGNORE INTO course_instructors VALUES (?,?)",
       );
       insert.run(course.id, course.owner_id);
-      for (const id of ids) insert.run(course.id, id);
+      for (const id of ids) {
+        insert.run(course.id, id);
+      }
     });
   }
   return {

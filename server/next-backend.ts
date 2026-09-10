@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
-import { createApp } from "./app.js";
+import { createApp, type AppInstance } from "./app";
 
 const globalForBackend = globalThis as unknown as {
-  backendApp: ReturnType<typeof createApp> | undefined;
+  backendApp: AppInstance | undefined;
 };
 
-export const getAppInstance = () => {
+export const getAppInstance = (): AppInstance => {
   if (!globalForBackend.backendApp) {
     const databasePath = resolve(process.env.LMS_DATABASE || ".local/lms.sqlite");
     const origin = process.env.APP_ORIGIN || "http://localhost:3000";
@@ -18,7 +18,7 @@ export const getAppInstance = () => {
         : undefined,
       enableWorkers: true,
       staticDir: null,
-    } as any);
+    });
   }
   return globalForBackend.backendApp;
 };

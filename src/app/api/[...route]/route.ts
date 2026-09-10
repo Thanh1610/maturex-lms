@@ -1,3 +1,5 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Socket } from "node:net";
 import { Readable } from "node:stream";
 import { type NextRequest, NextResponse } from "next/server";
 import { getAppInstance } from "@/../server/next-backend";
@@ -41,30 +43,32 @@ const handleRequest = async (req: NextRequest) => {
   const headers = extractHeaders(req);
 
   return new Promise<Response>((resolvePromise) => {
-    const mockReq = new Readable({
+    const stream = new Readable({
       read() {
         if (bodyBuffer && bodyBuffer.length > 0) {
           this.push(bodyBuffer);
         }
         this.push(null);
       },
-    }) as any;
+    });
 
-    mockReq.url = path;
-    mockReq.method = method;
-    mockReq.headers = headers;
-    mockReq.socket = { remoteAddress: "127.0.0.1" };
+    const mockReq = Object.assign(stream, {
+      url: path,
+      method,
+      headers,
+      socket: { remoteAddress: "127.0.0.1" } as unknown as Socket,
+    }) as unknown as IncomingMessage;
 
     const responseHeaders = new Headers();
     const responseChunks: Buffer[] = [];
     const responseState = { status: 200 };
 
-    const mockRes: any = {
-      setHeader(name: string, value: any) {
+    const mockRes = {
+      setHeader(name: string, value: unknown) {
         if (name.toLowerCase() === "set-cookie") {
           const cookies = Array.isArray(value) ? value : [String(value)];
           for (const cookie of cookies) {
-            responseHeaders.append("set-cookie", cookie);
+            responseHeaders.append("set-cookie", String(cookie));
           }
         } else {
           responseHeaders.set(name, String(value));
@@ -73,25 +77,25 @@ const handleRequest = async (req: NextRequest) => {
       getHeader(name: string) {
         return responseHeaders.get(name);
       },
-      writeHead(status: number, headersObj?: Record<string, any>) {
+      writeHead(status: number, headersObj?: Record<string, unknown>) {
         responseState.status = status;
         if (headersObj) {
           for (const [key, val] of Object.entries(headersObj)) {
-            mockRes.setHeader(key, val);
+            mockRes.setHeader(key, val as string | number | readonly string[]);
           }
         }
       },
-      write(chunk: any) {
+      write(chunk: unknown) {
         if (chunk) {
           responseChunks.push(
-            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
+            Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)),
           );
         }
       },
-      end(chunk?: any) {
+      end(chunk?: unknown) {
         if (chunk) {
           responseChunks.push(
-            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
+            Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)),
           );
         }
         const body = Buffer.concat(responseChunks);
@@ -103,9 +107,9 @@ const handleRequest = async (req: NextRequest) => {
         );
       },
       headersSent: false,
-    };
+    } as unknown as ServerResponse;
 
-    (server as any).emit("request", mockReq, mockRes);
+    server.emit("request", mockReq, mockRes);
   });
 };
 

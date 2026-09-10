@@ -23,14 +23,20 @@ export function LoginForm({
 }: {
   setup: boolean;
   onLogin: () => void;
-  resumeUser?: any;
+  resumeUser?: { id: string; email: string } | null;
 }) {
-  const [provider, setProvider] = useState<any>(null);
+  const [provider, setProvider] = useState<{
+    configured: boolean;
+    startUrl: string;
+    label: string;
+  } | null>(null);
   const [serverError, setServerError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api("/auth/providers")
+    api<{ oidc: { configured: boolean; startUrl: string; label: string } }>(
+      "/auth/providers",
+    )
       .then((d) => setProvider(d.oidc))
       .catch(() => {});
   }, []);
@@ -74,7 +80,11 @@ export function LoginForm({
     setBusy(true);
     setServerError("");
     try {
-      const result = await api(setup ? "/setup" : "/login", "POST", values);
+      const result = await api<{ user: { id: string } }>(
+        setup ? "/setup" : "/login",
+        "POST",
+        values,
+      );
       if (resumeUser && result.user.id !== resumeUser.id) {
         await api("/logout", "POST", {});
         throw new Error(
@@ -84,8 +94,8 @@ export function LoginForm({
         );
       }
       await onLogin();
-    } catch (error: any) {
-      setServerError(error.message);
+    } catch (error: unknown) {
+      setServerError(error instanceof Error ? error.message : "Có lỗi xảy ra");
     } finally {
       setBusy(false);
     }

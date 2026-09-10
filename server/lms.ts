@@ -1,92 +1,135 @@
 import { randomUUID } from "node:crypto";
-import { check, textField } from "./auth.js";
-import { transaction } from "./database.js";
+import { check, type PublicUser, textField } from "./auth";
 import {
-  initCourseTeams,
   courseVersion,
-  hasTable,
-  isCourseInstructor,
   hasCourseLearningAccess,
+  hasTable,
+  initCourseTeams,
+  isCourseInstructor,
   listCourseInstructors,
-} from "./course-access.js";
+} from "./course-access";
+import { type AppDatabase, transaction } from "./database";
 
 const now = () => new Date().toISOString();
-export function canTeach(user) {
+
+export function canTeach(user: { role: string }): void {
   check(
     ["admin", "instructor"].includes(user.role),
     403,
     "Bạn không có quyền quản lý đào tạo.",
   );
 }
-function ownedCourse(db, user, id) {
+
+function ownedCourse(
+  db: AppDatabase,
+  user: { id: string; role: string },
+  id: string,
+): Record<string, unknown> {
   canTeach(user);
-  const course = db.prepare("SELECT * FROM courses WHERE id=?").get(id);
+  const course = db.prepare("SELECT * FROM courses WHERE id=?").get(id) as
+    | Record<string, unknown>
+    | undefined;
   check(course, 404, "Không tìm thấy khóa học.");
   check(
-    isCourseInstructor(db, user, course.id),
+    isCourseInstructor(db, user, String(course.id)),
     403,
     "Bạn không phụ trách khóa học này.",
   );
   return course;
 }
-function lessons(db, id) {
+
+function lessons(
+  db: AppDatabase,
+  id: string,
+): Array<Record<string, unknown>> {
   return db
     .prepare("SELECT * FROM lessons WHERE course_id=? ORDER BY position")
-    .all(id);
+    .all(id) as Array<Record<string, unknown>>;
 }
-function courseFields(body) {
-  const fields = {
+
+interface LessonField {
+  id: string | null;
+  title: string;
+  content: string;
+}
+
+interface CourseFields {
+  title: string;
+  description: string;
+  category: string;
+  skill: string;
+  exercise: string;
+  lessons: LessonField[];
+}
+
+function courseFields(body: Record<string, unknown>): CourseFields {
+  const fields: CourseFields = {
     title: textField(body.title, "Tên khóa học", 180),
     description: textField(body.description, "Mô tả", 5000),
     category: textField(body.category, "Danh mục", 100),
     skill: textField(body.skill, "Năng lực", 100),
     exercise: textField(body.exercise, "Đề bài thực hành", 10000),
+    lessons: [],
   };
+  const bodyLessons = body.lessons;
   check(
-    Array.isArray(body.lessons) &&
-      body.lessons.length >= 1 &&
-      body.lessons.length <= 50,
+    Array.isArray(bodyLessons) &&
+      bodyLessons.length >= 1 &&
+      bodyLessons.length <= 50,
     400,
     "Khóa học cần từ 1 đến 50 bài học.",
   );
-  fields.lessons = body.lessons.map((lesson) => {
-    check(lesson && typeof lesson === "object", 400, "Bài học không hợp lệ.");
+  fields.lessons = bodyLessons.map((lesson) => {
+    check(
+      lesson && typeof lesson === "object",
+      400,
+      "Bài học không hợp lệ.",
+    );
+    const l = lesson as Record<string, unknown>;
     return {
-      id: typeof lesson.id === "string" ? lesson.id : null,
-      title: textField(lesson.title, "Tên bài học", 180),
-      content: textField(lesson.content, "Nội dung bài học", 30000),
+      id: typeof l.id === "string" ? l.id : null,
+      title: textField(l.title, "Tên bài học", 180),
+      content: textField(l.content, "Nội dung bài học", 30000),
     };
   });
   return fields;
 }
-export function saveCourse(db, user, body, id) {
+
+export function saveCourse(
+  db: AppDatabase,
+  user: { id: string; role: string },
+  body: Record<string, unknown>,
+  id?: string,
+): Record<string, unknown> {
   canTeach(user);
   const fields = courseFields(body);
   if (!hasTable(db, "course_revisions")) initCourseTeams(db);
   return transaction(db, () => {
-    if (id) {
-      ownedCourse(db, user, id);
+    let courseId = id;
+    if (courseId) {
+      ownedCourse(db, user, courseId);
       if (
         body.version !== undefined ||
-        listCourseInstructors(db, id).length > 1
-      )
+        listCourseInstructors(db, courseId).length > 1
+      ) {
         check(
           Number.isInteger(body.version) &&
-            body.version === courseVersion(db, id),
+            body.version === courseVersion(db, courseId),
           409,
           "Khóa học đã thay đổi. Hãy tải lại trước khi lưu.",
         );
+      }
       check(
         !db
           .prepare("SELECT 1 FROM enrollments WHERE course_id=? LIMIT 1")
-          .get(id) &&
+          .get(courseId) &&
           !(
             hasTable(db, "cohorts") &&
             db
               .prepare(
                 "SELECT 1 FROM cohort_members m JOIN cohorts c ON c.id=m.cohort_id WHERE c.course_id=? LIMIT 1",
               )
-              .get(id)
+              .get(courseId)
           ),
         409,
         "Khóa đã có người học. Hãy tạo khóa mới để giữ nguyên lịch sử học tập.",
@@ -99,13 +142,13 @@ export function saveCourse(db, user, body, id) {
         fields.category,
         fields.skill,
         fields.exercise,
-        id,
+        courseId,
       );
       db.prepare(
         "INSERT INTO course_revisions VALUES (?,1) ON CONFLICT(course_id) DO UPDATE SET version=version+1",
-      ).run(id);
-      const existing = lessons(db, id);
-      const seen = new Set();
+      ).run(courseId);
+      const existing = lessons(db, courseId);
+      const seen = new Set<string>();
       for (const lesson of fields.lessons) {
         if (lesson.id) {
           check(
@@ -116,22 +159,23 @@ export function saveCourse(db, user, body, id) {
           seen.add(lesson.id);
         }
       }
-      // Keep stable IDs and all linked quizzes/files on ordinary content edits.
       db.prepare(
         "UPDATE lessons SET position=position+1000 WHERE course_id=?",
-      ).run(id);
-      for (const old of existing)
-        if (!seen.has(old.id))
-          db.prepare("DELETE FROM lessons WHERE id=?").run(old.id);
+      ).run(courseId);
+      for (const old of existing) {
+        if (!seen.has(String(old.id))) {
+          db.prepare("DELETE FROM lessons WHERE id=?").run(String(old.id));
+        }
+      }
     } else {
       check(
         fields.lessons.every((l) => !l.id),
         400,
         "Khóa mới không được dùng mã bài học của khóa khác.",
       );
-      id = randomUUID();
+      courseId = randomUUID();
       db.prepare("INSERT INTO courses VALUES (?,?,?,?,?,?,?,?,?)").run(
-        id,
+        courseId,
         user.id,
         fields.title,
         fields.description,
@@ -141,43 +185,56 @@ export function saveCourse(db, user, body, id) {
         "draft",
         now(),
       );
-      db.prepare("INSERT INTO course_revisions VALUES (?,0)").run(id);
+      db.prepare("INSERT INTO course_revisions VALUES (?,0)").run(courseId);
       db.prepare("INSERT OR IGNORE INTO course_instructors VALUES (?,?)").run(
-        id,
+        courseId,
         user.id,
       );
     }
     fields.lessons.forEach((lesson, position) => {
-      if (lesson.id)
+      if (lesson.id) {
         db.prepare(
           "UPDATE lessons SET position=?,title=?,content=? WHERE id=? AND course_id=?",
-        ).run(position, lesson.title, lesson.content, lesson.id, id);
-      else
+        ).run(position, lesson.title, lesson.content, lesson.id, courseId);
+      } else {
         db.prepare("INSERT INTO lessons VALUES (?,?,?,?,?)").run(
           randomUUID(),
-          id,
+          courseId,
           position,
           lesson.title,
           lesson.content,
         );
+      }
     });
     return {
-      ...db.prepare("SELECT * FROM courses WHERE id=?").get(id),
-      version: courseVersion(db, id),
-      lessons: lessons(db, id),
+      ...(db.prepare("SELECT * FROM courses WHERE id=?").get(courseId) as Record<string, unknown>),
+      version: courseVersion(db, courseId),
+      lessons: lessons(db, courseId),
     };
   });
 }
-export function setCourseStatus(db, user, id, body) {
+
+export function setCourseStatus(
+  db: AppDatabase,
+  user: { id: string; role: string },
+  id: string,
+  body: Record<string, unknown>,
+): void {
   ownedCourse(db, user, id);
   check(
-    ["draft", "published", "archived"].includes(body.status),
+    typeof body.status === "string" &&
+      ["draft", "published", "archived"].includes(body.status),
     400,
     "Trạng thái khóa học không hợp lệ.",
   );
   db.prepare("UPDATE courses SET status=? WHERE id=?").run(body.status, id);
 }
-export function enroll(db, user, id) {
+
+export function enroll(
+  db: AppDatabase,
+  user: { id: string },
+  id: string,
+): void {
   transaction(db, () => {
     check(
       db
@@ -196,7 +253,13 @@ export function enroll(db, user, id) {
     ).run(randomUUID(), user.id, id, now());
   });
 }
-export function completeLesson(db, user, courseId, lessonId) {
+
+export function completeLesson(
+  db: AppDatabase,
+  user: { id: string },
+  courseId: string,
+  lessonId: string,
+): void {
   check(
     db
       .prepare("SELECT 1 FROM enrollments WHERE user_id=? AND course_id=?")
@@ -217,37 +280,52 @@ export function completeLesson(db, user, courseId, lessonId) {
     now(),
   );
 }
-export function changeAssignment(db, user, id, body, review) {
+
+export function changeAssignment(
+  db: AppDatabase,
+  user: { id: string; role: string },
+  id: string,
+  body: Record<string, unknown>,
+  review: boolean,
+): void {
   if (review) canTeach(user);
-  return transaction(db, () => {
+  transaction(db, () => {
     const assignment = db
       .prepare(
         "SELECT a.*, c.owner_id, c.skill FROM assignments a JOIN courses c ON c.id=a.course_id WHERE a.id=?",
       )
-      .get(id);
+      .get(id) as unknown as {
+        course_id: string;
+        user_id: string;
+        version: number;
+        status: string;
+        body: string;
+        skill: string;
+      } | undefined;
     check(
       assignment &&
         (review
-          ? isCourseInstructor(db, user, assignment.course_id)
+          ? isCourseInstructor(db, user, String(assignment.course_id))
           : assignment.user_id === user.id),
       404,
       "Không tìm thấy bài tập.",
     );
-    if (review)
+    if (review) {
       check(
         assignment.user_id !== user.id,
         403,
         "Không thể tự đánh giá bài của mình.",
       );
+    }
     check(
       Number.isInteger(body.version) && body.version === assignment.version,
       409,
       "Bài đã thay đổi. Hãy tải lại dữ liệu trước khi gửi.",
     );
-    let status,
-      content = assignment.body,
-      feedback = "",
-      level = null;
+    let status: string;
+    let content = String(assignment.body || "");
+    let feedback = "";
+    let level: number | null = null;
     if (review) {
       check(
         assignment.status === "submitted",
@@ -255,7 +333,8 @@ export function changeAssignment(db, user, id, body, review) {
         "Bài không còn ở trạng thái chờ chấm.",
       );
       check(
-        ["approved", "revision"].includes(body.status),
+        typeof body.status === "string" &&
+          ["approved", "revision"].includes(body.status),
         400,
         "Kết quả đánh giá không hợp lệ.",
       );
@@ -263,15 +342,19 @@ export function changeAssignment(db, user, id, body, review) {
       status = body.status;
       if (status === "approved") {
         check(
-          Number.isInteger(body.level) && body.level >= 1 && body.level <= 4,
+          Number.isInteger(body.level) &&
+            typeof body.level === "number" &&
+            body.level >= 1 &&
+            body.level <= 4,
           400,
           "Mức năng lực cần từ 1 đến 4.",
         );
-        level = body.level;
+        level = body.level as number;
       }
     } else {
       check(
-        ["todo", "revision"].includes(assignment.status),
+        typeof assignment.status === "string" &&
+          ["todo", "revision"].includes(assignment.status),
         409,
         "Chỉ có thể nộp bài mới hoặc bài cần bổ sung.",
       );
@@ -293,7 +376,7 @@ export function changeAssignment(db, user, id, body, review) {
       assignment.version + 1,
       timestamp,
     );
-    if (status === "approved")
+    if (status === "approved" && level !== null) {
       db.prepare("INSERT INTO evidence VALUES (?,?,?,?,?,?)").run(
         id,
         assignment.user_id,
@@ -302,47 +385,56 @@ export function changeAssignment(db, user, id, body, review) {
         user.id,
         timestamp,
       );
+    }
   });
 }
-export function getState(db, user) {
-  const courses = db
-    .prepare(
-      `SELECT c.*, u.name AS teacher,
+
+export function getState(db: AppDatabase, user: PublicUser): Record<string, unknown> {
+  const courses = (
+    db
+      .prepare(
+        `SELECT c.*, u.name AS teacher,
     (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id) AS enrollment_count
     FROM courses c JOIN users u ON u.id=c.owner_id
     ORDER BY c.created_at DESC`,
-    )
-    .all()
+      )
+      .all() as Array<Record<string, unknown>>
+  )
     .filter(
       (course) =>
         course.status === "published" ||
-        hasCourseLearningAccess(db, user, course.id),
+        hasCourseLearningAccess(db, user, String(course.id)),
     )
     .map((course) => ({
       ...course,
-      version: courseVersion(db, course.id),
-      lessons: lessons(db, course.id),
-      instructors: listCourseInstructors(db, course.id),
-      can_teach: isCourseInstructor(db, user, course.id),
+      version: courseVersion(db, String(course.id)),
+      lessons: lessons(db, String(course.id)),
+      instructors: listCourseInstructors(db, String(course.id)),
+      can_teach: isCourseInstructor(db, user, String(course.id)),
       cohort_enrollment_count: hasTable(db, "cohorts")
-        ? db
-            .prepare(
-              "SELECT COUNT(*) n FROM cohort_members m JOIN cohorts c ON c.id=m.cohort_id WHERE c.course_id=?",
-            )
-            .get(course.id).n
+        ? (
+            db
+              .prepare(
+                "SELECT COUNT(*) n FROM cohort_members m JOIN cohorts c ON c.id=m.cohort_id WHERE c.course_id=?",
+              )
+              .get(String(course.id)) as unknown as { n: number }
+          ).n
         : 0,
     }));
-  const assignments = db
-    .prepare(
-      `SELECT a.*, u.name AS learner_name, c.title AS course_title, c.exercise, c.skill, c.owner_id
+
+  const assignments = (
+    db
+      .prepare(
+        `SELECT a.*, u.name AS learner_name, c.title AS course_title, c.exercise, c.skill, c.owner_id
     FROM assignments a JOIN courses c ON c.id=a.course_id JOIN users u ON u.id=a.user_id
     ORDER BY a.updated_at DESC`,
-    )
-    .all()
+      )
+      .all() as Array<Record<string, unknown>>
+  )
     .filter(
       (assignment) =>
         assignment.user_id === user.id ||
-        isCourseInstructor(db, user, assignment.course_id),
+        isCourseInstructor(db, user, String(assignment.course_id)),
     )
     .map((assignment) => ({
       ...assignment,
@@ -351,8 +443,9 @@ export function getState(db, user) {
           `SELECT h.*, u.name AS actor_name FROM assignment_history h
       JOIN users u ON u.id=h.actor_id WHERE h.assignment_id=? ORDER BY version`,
         )
-        .all(assignment.id),
+        .all(String(assignment.id)),
     }));
+
   return {
     user,
     courses,

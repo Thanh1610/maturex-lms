@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { createApp } from "./app.js";
+import { createApp } from "./app";
 
 const port = Number(process.env.API_PORT || 3001);
 const serve =
@@ -8,6 +8,7 @@ const origin =
   process.env.APP_ORIGIN ||
   (serve ? `http://127.0.0.1:${port}` : "http://127.0.0.1:5173");
 const databasePath = resolve(process.env.LMS_DATABASE || ".local/lms.sqlite");
+
 const { server, db, integrations } = createApp({
   databasePath,
   origin,
@@ -18,11 +19,13 @@ const { server, db, integrations } = createApp({
   enableWorkers: true,
   staticDir: serve ? resolve("dist") : null,
 });
+
 server.listen(port, process.env.APP_HOST || "127.0.0.1", () =>
   console.log(
     `MX LMS API: http://127.0.0.1:${port} | Database: ${databasePath}`,
   ),
 );
+
 let stopping = false;
 function shutdown() {
   if (stopping) return;
@@ -33,5 +36,6 @@ function shutdown() {
     process.exit(0);
   });
 }
+
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
