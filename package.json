@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node --env-file-if-exists=.env tools/dev.mjs",
+    "dev:next": "next dev",
     "dev:all": "node --env-file-if-exists=.env tools/dev.mjs",
     "server": "node server/index.js",
     "backup": "node --env-file-if-exists=.env tools/backup.mjs",

@@ -9,7 +9,10 @@ const apiPort = Number(process.env.API_PORT || 3001);
 async function available(port) {
   await new Promise((resolve, reject) => {
     const probe = createServer();
-    probe.once("error", reject);
+    probe.once("error", (err) => {
+      err.port = port;
+      reject(err);
+    });
     probe.listen(port, "127.0.0.1", () => probe.close(resolve));
   });
 }
@@ -18,7 +21,7 @@ try {
   await available(apiPort);
 } catch (error) {
   console.error(
-    `Không thể khởi động: cổng ${error.port} đang được sử dụng. Đặt WEB_PORT/API_PORT khác hoặc dừng tiến trình cũ.`,
+    `Không thể khởi động: cổng ${error.port || "3000/3001"} đang được sử dụng. Đặt WEB_PORT/API_PORT khác hoặc dừng tiến trình cũ.`,
   );
   process.exit(1);
 }

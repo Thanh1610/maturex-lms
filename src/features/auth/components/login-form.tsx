@@ -1,6 +1,6 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
   Badge,
@@ -110,7 +110,8 @@ export function LoginForm({
           Trưởng thành cùng nhau.
         </h1>
         <p className="text-[#8a7f98] max-w-sm mt-3 leading-relaxed hidden md:block">
-          Một không gian để học, thực hành và nhìn thấy sự tiến bộ của chính mình.
+          Một không gian để học, thực hành và nhìn thấy sự tiến bộ của chính
+          mình.
         </p>
         <div className="mt-12 md:mt-16 flex items-center gap-4 text-[#8b7b9b] text-xs leading-relaxed hidden md:flex">
           <Icon name="Sprout" size={32} />
@@ -194,7 +195,9 @@ export function LoginForm({
                       <Input
                         type="password"
                         placeholder="••••••••••••"
-                        autoComplete={setup ? "new-password" : "current-password"}
+                        autoComplete={
+                          setup ? "new-password" : "current-password"
+                        }
                         disabled={busy}
                         {...field}
                       />

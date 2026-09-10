@@ -1,6 +1,6 @@
-import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 
@@ -9,15 +9,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+        default:
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20",
         outline:
           "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
@@ -42,7 +42,14 @@ export interface ButtonProps
   extends React.ComponentProps<"button">,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
-  kind?: "primary" | "secondary" | "danger" | "ghost" | "link" | "outline" | string;
+  kind?:
+    | "primary"
+    | "secondary"
+    | "danger"
+    | "ghost"
+    | "link"
+    | "outline"
+    | string;
   icon?: string;
 }
 
@@ -77,7 +84,9 @@ function Button({
       data-slot="button"
       data-variant={resolvedVariant}
       data-size={size}
-      className={cn(buttonVariants({ variant: resolvedVariant, size, className }))}
+      className={cn(
+        buttonVariants({ variant: resolvedVariant, size, className }),
+      )}
       {...props}
     >
       {icon && <Icon name={icon} size={15} />}
