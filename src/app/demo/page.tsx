@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-const App = dynamic(() => import("../../App"), {
+const App = dynamic(() => import("@/features/demo-preview/demo-app"), {
   ssr: false,
   loading: () => (
     <div
