@@ -10,7 +10,6 @@ import { Assistant } from "./Integrations.jsx";
 import { Paths, Reports, Team } from "./Organization.jsx";
 import { PasswordRecovery, Settings } from "./Settings.jsx";
 import { Calendar, Community, Notifications } from "./Social.jsx";
-import "./live.css";
 
 function Login({ setup, onLogin, resumeUser }) {
   const [provider, setProvider] = useState(null);

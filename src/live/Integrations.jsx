@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge, Button } from "../ui.jsx";
 import { api, dateLabel } from "./api.js";
-import "./integrations.css";
 
 export function Assistant({ state, go }) {
   const [courseId, setCourseId] = useState(state.courses[0]?.id || "");

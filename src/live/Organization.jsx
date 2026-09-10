@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Empty, Icon } from "../ui.jsx";
 import { api, statusLabels } from "./api.js";
-import "./organization.css";
 
 const progressLabels = {
   completed: "Hoàn thành",

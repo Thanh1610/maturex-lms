@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Icon } from "../ui.jsx";
 import { api } from "./api.js";
-import "./learning-tools.css";
 
 export function FilePanel({
   courseId,
@@ -112,11 +111,15 @@ export function FilePanel({
       {notice && <p role="status">{notice}</p>}
       {files.length ? (
         files.map((file) => (
-          <div key={file.id} className="learning-file">
+          <div
+            key={file.id}
+            className="border border-[var(--border)] p-[14px] rounded-[9px] mb-3"
+          >
             {file.mime.startsWith("video/") ? (
               <video
                 controls
                 preload="metadata"
+                className="w-full max-h-[460px] bg-[#17141f] rounded-lg mb-3"
                 src={`/api/files/${file.id}`}
                 aria-label={file.name}
               />
@@ -124,11 +127,13 @@ export function FilePanel({
               <audio
                 controls
                 preload="metadata"
+                className="w-full mb-3"
                 src={`/api/files/${file.id}`}
               />
             ) : null}
-            <div className="between">
+            <div className="between flex-wrap">
               <a
+                className="[overflow-wrap:anywhere]"
                 href={`/api/files/${file.id}`}
                 target="_blank"
                 rel="noreferrer"
@@ -242,10 +247,10 @@ export function LessonTools({ course, lesson, state }) {
           {error}
         </p>
       )}
-      <section className="learning-tool">
+      <section className="border-t border-[var(--border)] mt-6 pt-6">
         <h3>Ghi chú riêng của bạn</h3>
         {data ? (
-          <form className="live-form" onSubmit={saveNote}>
+          <form className="live-form mt-[14px]" onSubmit={saveNote}>
             <label>
               Ghi chú bài học
               <textarea
@@ -268,16 +273,22 @@ export function LessonTools({ course, lesson, state }) {
         )}
       </section>
       {quiz && (
-        <section className="learning-tool">
+        <section className="border-t border-[var(--border)] mt-6 pt-6">
           <h3>Câu hỏi ôn tập</h3>
-          <form className="live-form" onSubmit={submit}>
-            <fieldset className="learning-quiz">
-              <legend>{quiz.question}</legend>
+          <form className="live-form mt-[14px]" onSubmit={submit}>
+            <fieldset className="border-0 p-0 m-0">
+              <legend className="font-semibold leading-[1.8] mb-3">
+                {quiz.question}
+              </legend>
               {quiz.options.map((option, index) => (
-                <label key={index}>
+                <label
+                  key={index}
+                  className="flex flex-row items-center p-3 bg-[#f8f6fc] rounded-lg mb-2"
+                >
                   <input
                     type="radio"
                     required
+                    className="w-auto"
                     name={`quiz-${lesson.id}`}
                     checked={answer === String(index)}
                     onChange={() => setAnswer(String(index))}
@@ -380,7 +391,10 @@ export function ContentTools({ course, onClose }) {
         lessonId={selected}
         editable
       />
-      <form className="live-form learning-tool" onSubmit={save}>
+      <form
+        className="live-form border-t border-[var(--border)] mt-6 pt-6"
+        onSubmit={save}
+      >
         <h3>Biên soạn câu hỏi ôn tập</h3>
         <label>
           Câu hỏi

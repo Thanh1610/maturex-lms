@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui.jsx";
 import { api } from "./api.js";
-import "./cohorts.css";
 
 export function CourseTeam({ course, onClose, onSaved }) {
   const [data, setData] = useState(null),

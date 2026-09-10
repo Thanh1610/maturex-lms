@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Button, download, Empty } from "../ui.jsx";
 import { api, dateLabel, statusLabels } from "./api.js";
 import { FilePanel, LessonTools } from "./LearningTools.jsx";
-import "./cohorts.css";
 
 const classLabels = {
   draft: "Chuẩn bị",

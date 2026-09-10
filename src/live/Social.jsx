@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Empty, Icon } from "../ui.jsx";
 import { api, dateLabel } from "./api.js";
-import "./social.css";
 
 function useSocial(path, _state, mutate) {
   const [data, setData] = useState(null);

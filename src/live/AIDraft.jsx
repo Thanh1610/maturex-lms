@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Badge, Button } from "../ui.jsx";
 import { api } from "./api.js";
-import "./integrations.css";
 
 export function AIDraft({ onDraft }) {
   const [topic, setTopic] = useState("");
