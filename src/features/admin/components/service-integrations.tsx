@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Label,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
+} from "@/components/ui";
 import { api } from "@/lib/api-client";
 import { dateLabel } from "@/lib/formatters";
 
@@ -266,14 +277,11 @@ export function ServiceIntegrations({
                 {error}
               </div>
             )}
-            <label
-              className="flex flex-col gap-2 text-[11px] font-medium min-w-0"
-              htmlFor="assistant-question"
-            >
-              Câu hỏi của bạn
-              <textarea
+            <div className="flex flex-col gap-2 min-w-0">
+              <Label htmlFor="assistant-question">Câu hỏi của bạn</Label>
+              <Textarea
                 id="assistant-question"
-                className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-white"
+                className="bg-white"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 maxLength={4000}
@@ -282,7 +290,7 @@ export function ServiceIntegrations({
                 disabled={sending || !courseId || !config?.ai.configured}
                 placeholder="Ví dụ: Giải thích khái niệm chính của bài đầu tiên…"
               />
-            </label>
+            </div>
             <div className="between flex items-center justify-between gap-[18px]">
               <small className="muted text-[11px] text-[var(--muted,#757185)] leading-[1.55] max-w-[75%]">
                 Nội dung trao đổi và tài liệu khóa học được gửi tới dịch vụ AI
@@ -419,62 +427,62 @@ export function IntegrationStatus({ state }: { state: any }) {
               đã chấp nhận thư; không xác nhận thư đã vào hộp thư người nhận.
             </p>
           </div>
-          <table className="live-table w-full border-collapse text-left">
-            <thead>
-              <tr className="bg-[#fcfcfd] border-b border-[var(--border,#e9eaf0)]">
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+          <Table>
+            <TableHeader className="bg-[#fcfcfd]">
+              <TableRow className="border-b border-[var(--border,#e9eaf0)]">
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Người nhận
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Tiêu đề
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Trạng thái
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Số lần thử
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Kết quả gần nhất
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {outbox.map((m) => (
-                <tr
+                <TableRow
                   className="border-b border-[var(--border,#e9eaf0)] hover:bg-[#faf9fc]"
                   key={m.id}
                 >
-                  <td className="p-[18px_22px] text-[11px] whitespace-nowrap">
+                  <TableCell className="p-[18px_22px] text-[11px] whitespace-nowrap">
                     {m.recipient}
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] text-[#332f42] font-medium whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] text-[#332f42] font-medium whitespace-nowrap">
                     {m.subject}
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] whitespace-nowrap">
                     {deliveryLabel[m.status]}
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] text-[#555064] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] text-[#555064] whitespace-nowrap">
                     {m.attempts}
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] text-[#757185] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] text-[#757185] whitespace-nowrap">
                     {m.last_error ||
                       (m.sent_at ? dateLabel(m.sent_at) : "Đang chờ xử lý")}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {!outbox.length && (
-                <tr>
-                  <td
+                <TableRow>
+                  <TableCell
                     className="p-[18px_22px] text-[11px] text-[var(--muted,#757185)]"
                     colSpan={5}
                   >
                     Chưa có email được đưa vào hàng đợi.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </section>
       )}
     </>

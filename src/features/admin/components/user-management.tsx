@@ -1,5 +1,16 @@
 import { useEffect, useState } from "react";
-import { Badge, Button } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Label,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
 import { api, roleLabels } from "@/lib/api-client";
 
 export function UserManagement({
@@ -9,12 +20,13 @@ export function UserManagement({
   mutate: any;
   busy: boolean;
 }) {
-  const [users, setUsers] = useState(null);
+  const [users, setUsers] = useState<any[] | null>(null);
   const [error, setError] = useState("");
   const [show, setShow] = useState(false);
-  const [editing, setEditing] = useState(null),
-    [resetUrl, setResetUrl] = useState("");
-  async function reset(id) {
+  const [editing, setEditing] = useState<any | null>(null);
+  const [resetUrl, setResetUrl] = useState("");
+
+  async function reset(id: string) {
     setError("");
     const result = await mutate(
       `/users/${id}/reset`,
@@ -24,18 +36,21 @@ export function UserManagement({
     );
     if (result) setResetUrl(`${location.origin}/#reset/${result.token}`);
   }
+
   async function load() {
     try {
       setUsers((await api("/users")).users);
       setError("");
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message);
     }
   }
+
   useEffect(() => {
     load();
-  }, [load]);
-  async function submit(event) {
+  }, []);
+
+  async function submit(event: any) {
     event.preventDefault();
     const form = event.currentTarget;
     const result = await mutate(
@@ -50,6 +65,7 @@ export function UserManagement({
       await load();
     }
   }
+
   return (
     <>
       <div className="between live-page-heading flex items-center justify-between gap-4 mb-7">
@@ -68,6 +84,7 @@ export function UserManagement({
           {show ? "Đóng biểu mẫu" : "Thêm tài khoản"}
         </Button>
       </div>
+
       {show && (
         <form
           className="live-panel live-form live-editor bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] mb-[25px]"
@@ -77,33 +94,33 @@ export function UserManagement({
             Tài khoản mới
           </h2>
           <div className="live-two-col grid grid-cols-2 max-[760px]:grid-cols-1 gap-[18px]">
-            <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-              Họ và tên
-              <input
-                className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <Label htmlFor="create-name">Họ và tên</Label>
+              <Input
+                id="create-name"
                 name="name"
                 required
                 maxLength={100}
                 autoComplete="off"
               />
-            </label>
-            <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-              Email
-              <input
-                className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            </div>
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
                 name="email"
                 type="email"
                 required
                 maxLength={254}
                 autoComplete="off"
               />
-            </label>
+            </div>
           </div>
           <div className="live-two-col grid grid-cols-2 max-[760px]:grid-cols-1 gap-[18px]">
-            <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-              Mật khẩu ban đầu
-              <input
-                className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <Label htmlFor="create-password">Mật khẩu ban đầu</Label>
+              <Input
+                id="create-password"
                 type="password"
                 name="password"
                 required
@@ -111,11 +128,12 @@ export function UserManagement({
                 maxLength={128}
                 autoComplete="new-password"
               />
-            </label>
-            <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-              Vai trò
+            </div>
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <Label htmlFor="create-role">Vai trò</Label>
               <select
-                className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+                id="create-role"
+                className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-white"
                 name="role"
                 defaultValue="learner"
               >
@@ -125,7 +143,7 @@ export function UserManagement({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           </div>
           <small className="muted text-[9px] text-[var(--muted,#757185)] leading-relaxed">
             Mật khẩu cần ít nhất 12 ký tự. Gửi thông tin đăng nhập cho thành
@@ -138,20 +156,24 @@ export function UserManagement({
           </div>
         </form>
       )}
+
       {resetUrl && (
         <div className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] mb-5">
           <h3 className="text-[15px] font-bold text-[#1f1b2d] mb-0">
             Liên kết đặt lại mật khẩu
           </h3>
-          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-            Gửi riêng cho người sở hữu tài khoản
-            <input
-              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-[#f8f9fb]"
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <Label htmlFor="reset-url-input">
+              Gửi riêng cho người sở hữu tài khoản
+            </Label>
+            <Input
+              id="reset-url-input"
               readOnly
               value={resetUrl}
               onFocus={(e) => e.target.select()}
+              className="bg-[#f8f9fb]"
             />
-          </label>
+          </div>
           <small className="muted text-[9px] text-[var(--muted,#757185)]">
             Liên kết dùng một lần, hết hạn sau 20 phút.
           </small>
@@ -162,6 +184,7 @@ export function UserManagement({
           </div>
         </div>
       )}
+
       {editing && (
         <UserEditor
           key={editing.id}
@@ -175,6 +198,7 @@ export function UserManagement({
           }}
         />
       )}
+
       {error && (
         <div
           className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] mb-[18px] leading-[1.8] flex items-center justify-between"
@@ -186,55 +210,56 @@ export function UserManagement({
           </Button>
         </div>
       )}
+
       {!users ? (
         <p className="text-[12px] text-[var(--muted,#757185)]" role="status">
           Đang tải tài khoản…
         </p>
       ) : (
-        <div className="live-panel live-table-wrap bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-0 shadow-[0_1px_3px_rgba(0,0,0,0.02)] overflow-x-auto">
-          <table className="live-table w-full border-collapse text-left">
-            <thead>
-              <tr className="bg-[#fcfcfd] border-b border-[var(--border,#e9eaf0)]">
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+        <div className="bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+          <Table>
+            <TableHeader className="bg-[#fcfcfd]">
+              <TableRow className="border-b border-[var(--border,#e9eaf0)]">
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Thành viên
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Email
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Vai trò
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Nhóm / trạng thái
-                </th>
-                <th className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
+                </TableHead>
+                <TableHead className="p-[18px_22px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap">
                   Quản lý
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {users.map((user) => (
-                <tr
+                <TableRow
                   className="border-b border-[var(--border,#e9eaf0)] hover:bg-[#faf9fc]"
                   key={user.id}
                 >
-                  <td className="p-[18px_22px] text-[11px] whitespace-nowrap">
+                  <TableCell className="p-[18px_22px] text-[11px] whitespace-nowrap">
                     <strong className="text-[#1f1b2d]">{user.name}</strong>
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] text-[#555064] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] text-[#555064] whitespace-nowrap">
                     {user.email}
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] whitespace-nowrap">
                     <Badge>{roleLabels[user.role]}</Badge>
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] text-[#555064] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] text-[#555064] whitespace-nowrap">
                     {user.team || "Chưa phân nhóm"}
                     <br />
                     <small className="text-[9px] text-[var(--muted,#757185)]">
                       {user.active ? "Đang hoạt động" : "Đã vô hiệu hóa"}
                     </small>
-                  </td>
-                  <td className="p-[18px_22px] text-[11px] whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="p-[18px_22px] text-[11px] whitespace-nowrap">
                     <div className="flex items-center gap-1">
                       <Button
                         kind="ghost"
@@ -251,19 +276,31 @@ export function UserManagement({
                         Đặt lại mật khẩu
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </>
   );
 }
 
-function UserEditor({ target, users, mutate, busy, onDone }) {
-  async function submit(e) {
+function UserEditor({
+  target,
+  users,
+  mutate,
+  busy,
+  onDone,
+}: {
+  target: any;
+  users: any;
+  mutate: any;
+  busy: boolean;
+  onDone: () => Promise<void>;
+}) {
+  async function submit(e: any) {
     e.preventDefault();
     const values = Object.fromEntries(new FormData(e.currentTarget));
     const result = await mutate(
@@ -278,6 +315,7 @@ function UserEditor({ target, users, mutate, busy, onDone }) {
     );
     if (result) onDone();
   }
+
   return (
     <form
       className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] mb-5"
@@ -292,60 +330,62 @@ function UserEditor({ target, users, mutate, busy, onDone }) {
         </Button>
       </div>
       <div className="live-two-col grid grid-cols-2 max-[760px]:grid-cols-1 gap-[18px]">
-        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-          Họ tên
-          <input
-            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="edit-name">Họ tên</Label>
+          <Input
+            id="edit-name"
             name="name"
             required
             maxLength={100}
             defaultValue={target.name}
           />
-        </label>
-        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-          Chức danh
-          <input
-            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="edit-job">Chức danh</Label>
+          <Input
+            id="edit-job"
             name="job"
             maxLength={150}
             defaultValue={target.job}
           />
-        </label>
-        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-          Nhóm
-          <input
-            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="edit-team">Nhóm</Label>
+          <Input
+            id="edit-team"
             name="team"
             maxLength={100}
             defaultValue={target.team}
           />
-        </label>
-        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-          Quản lý trực tiếp
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="edit-manager">Quản lý trực tiếp</Label>
           <select
-            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            id="edit-manager"
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-white"
             name="manager_id"
             defaultValue={target.manager_id || ""}
           >
             <option value="">Chưa phân công</option>
             {users
-              .filter(
-                (u) =>
+              ?.filter(
+                (u: any) =>
                   u.id !== target.id &&
                   u.active &&
                   ["manager", "admin"].includes(u.role),
               )
-              .map((u) => (
+              .map((u: any) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>
               ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-          Vai trò tài khoản
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="edit-role">Vai trò tài khoản</Label>
           <select
-            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            id="edit-role"
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-white"
             name="role"
             defaultValue={target.role}
           >
@@ -355,18 +395,19 @@ function UserEditor({ target, users, mutate, busy, onDone }) {
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-          Trạng thái tài khoản
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="edit-active">Trạng thái tài khoản</Label>
           <select
-            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            id="edit-active"
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-white"
             name="active"
             defaultValue={target.active ? "1" : "0"}
           >
             <option value="1">Đang hoạt động</option>
             <option value="0">Vô hiệu hóa</option>
           </select>
-        </label>
+        </div>
       </div>
       <div className="self-start">
         <Button disabled={busy}>Lưu thay đổi tài khoản</Button>

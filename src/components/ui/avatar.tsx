@@ -1,14 +1,57 @@
+import * as AvatarPrimitive from "@radix-ui/react-avatar";
+import * as React from "react";
+import { cn } from "@/lib/utils";
 import type { Person } from "@/types/index";
 
-export function Avatar({
-  person,
-  size = "",
-  className = "",
-}: {
+const AvatarRoot = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative flex shrink-0 overflow-hidden rounded-full font-semibold items-center justify-center",
+      className,
+    )}
+    {...props}
+  />
+));
+AvatarRoot.displayName = AvatarPrimitive.Root.displayName;
+
+const AvatarImage = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Image>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Image
+    ref={ref}
+    className={cn("aspect-square h-full w-full", className)}
+    {...props}
+  />
+));
+AvatarImage.displayName = AvatarPrimitive.Image.displayName;
+
+const AvatarFallback = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Fallback>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Fallback
+    ref={ref}
+    className={cn(
+      "flex h-full w-full items-center justify-center rounded-full bg-muted font-semibold",
+      className,
+    )}
+    {...props}
+  />
+));
+AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
+
+export interface AvatarProps {
   person?: Partial<Person> & { initials?: string };
   size?: "small" | "large" | "";
   className?: string;
-}) {
+}
+
+export function Avatar({ person, size = "", className = "" }: AvatarProps) {
   const sizeClass =
     size === "small"
       ? "w-[29px] h-[29px] text-[10px]"
@@ -17,11 +60,21 @@ export function Avatar({
         : "w-[35px] h-[35px] text-[11px]";
 
   return (
-    <span
-      className={`avatar ${person?.color || "lavender"} ${size} rounded-full inline-flex items-center justify-center font-semibold shrink-0 ${sizeClass} ${className}`}
+    <AvatarRoot
+      className={cn(
+        "avatar",
+        person?.color || "lavender",
+        size,
+        sizeClass,
+        className,
+      )}
       title={person?.name}
     >
-      {person?.initials || "MA"}
-    </span>
+      <AvatarFallback className="bg-inherit text-inherit">
+        {person?.initials || "MA"}
+      </AvatarFallback>
+    </AvatarRoot>
   );
 }
+
+export { AvatarFallback, AvatarImage, AvatarRoot };

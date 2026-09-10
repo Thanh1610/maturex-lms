@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Input, Label, Textarea } from "@/components/ui";
 import { api } from "@/lib/api-client";
 
 export function AIDraft({ onDraft }) {
@@ -68,29 +68,31 @@ export function AIDraft({ onDraft }) {
         </p>
       )}
       <div className="live-two-col grid grid-cols-2 max-md:grid-cols-1 gap-[18px] mb-4">
-        <label className="flex flex-col gap-1.5 text-[12px] font-medium text-[#405167]">
-          Chủ đề khóa học
-          <input
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="ai-topic">Chủ đề khóa học</Label>
+          <Input
+            id="ai-topic"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             maxLength={180}
             disabled={busy || !configured}
             placeholder="Ví dụ: Kỹ năng phản hồi trong nhóm"
-            className="border border-[#d0dbe7] bg-white rounded-lg p-2.5 text-[12px] outline-none focus:border-[#7b61bd]"
+            className="bg-white"
           />
-        </label>
-        <label className="flex flex-col gap-1.5 text-[12px] font-medium text-[#405167]">
-          Mục tiêu học tập
-          <textarea
+        </div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Label htmlFor="ai-objectives">Mục tiêu học tập</Label>
+          <Textarea
+            id="ai-objectives"
             value={objectives}
             onChange={(e) => setObjectives(e.target.value)}
             maxLength={5000}
             rows={3}
             disabled={busy || !configured}
             placeholder="Người học cần hiểu và thực hiện được điều gì sau khóa học?"
-            className="border border-[#d0dbe7] bg-white rounded-lg p-2.5 text-[12px] outline-none focus:border-[#7b61bd] leading-[1.7]"
+            className="bg-white"
           />
-        </label>
+        </div>
       </div>
       <div className="between flex justify-between items-center gap-4 mt-2">
         <small className="muted text-[11px] text-[#718298]">

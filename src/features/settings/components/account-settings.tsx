@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Empty } from "@/components/ui";
+import {
+  Button,
+  Checkbox,
+  Empty,
+  Input,
+  Label,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui";
 import { api } from "@/lib/api-client";
 import { dateLabel } from "@/lib/formatters";
 import { IntegrationStatus } from "../../admin/components/service-integrations";
@@ -73,12 +85,10 @@ function NotificationPreferences({ user, mutate, busy }) {
       ) : (
         <>
           <label className="flex items-center gap-[10px] text-[12px] text-[#1f1b2d] font-normal cursor-pointer">
-            <input
-              className="w-auto h-4 w-4"
-              type="checkbox"
+            <Checkbox
               checked={enabled}
               disabled={busy}
-              onChange={(event) => setEnabled(event.target.checked)}
+              onCheckedChange={(checked) => setEnabled(Boolean(checked))}
             />
             Nhận thông báo học tập qua email
           </label>
@@ -157,51 +167,47 @@ function AuditLog() {
         />
       )}
       {!!entries?.length && (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left">
-            <caption className="muted text-left pb-3 text-[11px] text-[var(--muted,#757185)]">
-              Lịch sử thay đổi tài khoản và giao lộ trình
-            </caption>
-            <thead>
-              <tr className="bg-[#fcfcfd] border-b border-[var(--border,#e9eaf0)]">
+        <div className="bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+          <Table>
+            <TableHeader className="bg-[#fcfcfd]">
+              <TableRow className="border-b border-[var(--border,#e9eaf0)]">
                 {[
                   "Thời gian",
                   "Người thực hiện",
                   "Hoạt động",
                   "Mã đối tượng",
                 ].map((label) => (
-                  <th
-                    scope="col"
+                  <TableHead
                     key={label}
-                    className="p-[12px_10px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap border-b border-[#e5e5df]"
+                    className="p-[12px_14px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap"
                   >
                     {label}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {entries.map((entry) => (
-                <tr
+                <TableRow
                   className="border-b border-[#f2f1f5] hover:bg-[#faf9fc]"
                   key={entry.id}
                 >
-                  <td className="p-[12px_10px] text-[11px] whitespace-nowrap text-[#555064]">
+                  <TableCell className="p-[12px_14px] text-[11px] whitespace-nowrap text-[#555064]">
                     {dateLabel(entry.created_at)}
-                  </td>
-                  <td className="p-[12px_10px] text-[11px] font-medium text-[#1f1b2d]">
+                  </TableCell>
+                  <TableCell className="p-[12px_14px] text-[11px] font-medium text-[#1f1b2d]">
                     {entry.actor_name || "Hệ thống"}
-                  </td>
-                  <td className="p-[12px_10px] text-[11px] text-[#555064]">
+                  </TableCell>
+                  <TableCell className="p-[12px_14px] text-[11px] text-[#555064]">
                     {auditActions[entry.action] || entry.action}
-                  </td>
-                  <td className="p-[12px_10px] text-[11px] text-[#757185] break-words">
+                  </TableCell>
+                  <TableCell className="p-[12px_14px] text-[11px] text-[#757185] break-words">
                     {entry.target_id || "—"}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </section>
@@ -252,25 +258,25 @@ export function Settings({ state, mutate, busy }) {
           <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-0">
             Hồ sơ của bạn
           </h2>
-          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-            Họ và tên
-            <input
-              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <Label htmlFor="profile-name">Họ và tên</Label>
+            <Input
+              id="profile-name"
               name="name"
               defaultValue={state.user.name}
               required
               maxLength={100}
             />
-          </label>
-          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-            Chức danh
-            <input
-              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <Label htmlFor="profile-job">Chức danh</Label>
+            <Input
+              id="profile-job"
               name="job"
               defaultValue={state.user.job}
               maxLength={150}
             />
-          </label>
+          </div>
           <p className="muted text-[11px] text-[var(--muted,#757185)] leading-relaxed">
             {state.user.email}
             <br />
@@ -287,20 +293,20 @@ export function Settings({ state, mutate, busy }) {
           <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-0">
             Đổi mật khẩu
           </h2>
-          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-            Mật khẩu hiện tại
-            <input
-              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <Label htmlFor="current-pwd">Mật khẩu hiện tại</Label>
+            <Input
+              id="current-pwd"
               type="password"
               name="currentPassword"
               required
               autoComplete="current-password"
             />
-          </label>
-          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-            Mật khẩu mới
-            <input
-              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <Label htmlFor="new-pwd">Mật khẩu mới</Label>
+            <Input
+              id="new-pwd"
               type="password"
               name="newPassword"
               required
@@ -308,7 +314,7 @@ export function Settings({ state, mutate, busy }) {
               maxLength={128}
               autoComplete="new-password"
             />
-          </label>
+          </div>
           <small className="muted text-[9px] text-[var(--muted,#757185)]">
             Đổi mật khẩu sẽ đăng xuất các phiên đang mở.
           </small>
@@ -321,7 +327,9 @@ export function Settings({ state, mutate, busy }) {
             </p>
           )}
           <div className="self-start">
-            <Button disabled={saving}>Đổi mật khẩu</Button>
+            <Button disabled={saving || busy}>
+              {saving ? "Đang cập nhật…" : "Đổi mật khẩu"}
+            </Button>
           </div>
         </form>
       </div>

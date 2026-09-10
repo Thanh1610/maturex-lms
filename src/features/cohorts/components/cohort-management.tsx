@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button, download, Empty } from "@/components/ui";
+import { Badge, Button, Checkbox, download, Empty } from "@/components/ui";
 import { api } from "@/lib/api-client";
 import { dateLabel, statusLabels } from "@/lib/formatters";
 import {
@@ -134,13 +134,11 @@ function PeoplePicker({
             key={person.id}
             className="flex flex-row items-center gap-[10px] py-[7px] font-normal cursor-pointer"
           >
-            <input
-              type="checkbox"
-              className="w-[18px] h-[18px] flex-[0_0_18px] accent-[var(--purple)]"
+            <Checkbox
               checked={selected.includes(person.id)}
-              onChange={(event) =>
+              onCheckedChange={(checked) =>
                 setSelected(
-                  event.target.checked
+                  checked
                     ? [...selected, person.id]
                     : selected.filter((id) => id !== person.id),
                 )
