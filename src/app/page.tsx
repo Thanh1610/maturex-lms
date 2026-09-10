@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-const LiveApp = dynamic(() => import("../live/LiveApp.jsx"), {
+const LiveApp = dynamic(() => import("../live/LiveApp"), {
   ssr: false,
   loading: () => (
     <div

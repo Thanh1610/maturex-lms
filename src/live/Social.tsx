@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge, Button, Empty, Icon } from "../ui.jsx";
-import { api, dateLabel } from "./api.js";
+import { Badge, Button, Empty, Icon } from "../ui";
+import { api, dateLabel } from "./api";
 
-function useSocial(path, _state, mutate) {
-  const [data, setData] = useState(null);
+function useSocial(path: string, _state: any, mutate: any) {
+  const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
   const sequence = useRef(0);
   const reload = useCallback(async () => {
@@ -13,7 +13,7 @@ function useSocial(path, _state, mutate) {
       const next = await api(path);
       if (request === sequence.current) setData(next);
       return next;
-    } catch (error) {
+    } catch (error: any) {
       if (request === sequence.current) setError(error.message);
       return null;
     }
@@ -24,14 +24,19 @@ function useSocial(path, _state, mutate) {
       sequence.current++;
     };
   }, [reload]);
-  const change = async (path, method, body, message) => {
+  const change = async (
+    path: string,
+    method: string,
+    body: any,
+    message?: string,
+  ) => {
     const saved = await mutate(path, method, body, message);
     if (saved) await reload();
     return saved;
   };
   return { data, error, reload, change, setError };
 }
-function LoadState({ resource }) {
+function LoadState({ resource }: { resource: any }) {
   if (resource.error)
     return (
       <div className="live-error" role="alert">
@@ -49,10 +54,10 @@ function LoadState({ resource }) {
     );
   return null;
 }
-const localDate = (value) => {
+const localDate = (value: any) => {
   if (!value) return "";
   const date = new Date(value);
-  return new Date(date - date.getTimezoneOffset() * 60000)
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
 };
@@ -106,53 +111,63 @@ function EventEditor({ initial, busy, change, onClose }) {
     if (saved) onClose();
   }
   return (
-    <form onSubmit={save} className="live-panel live-form social-editor">
-      <div className="between">
-        <h2>{initial ? "Chỉnh sửa lịch học" : "Tạo lịch học"}</h2>
+    <form
+      onSubmit={save}
+      className="live-panel live-form social-editor bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] mb-[24px]"
+    >
+      <div className="between flex items-center justify-between gap-4">
+        <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-0">
+          {initial ? "Chỉnh sửa lịch học" : "Tạo lịch học"}
+        </h2>
         <Button kind="ghost" type="button" onClick={onClose} disabled={busy}>
           Đóng
         </Button>
       </div>
-      <label>
+      <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
         Tên lịch học
         <input
+          className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
           required
           maxLength={180}
           value={form.title}
           onChange={(e) => set("title", e.target.value)}
         />
       </label>
-      <label>
+      <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
         Mô tả
         <textarea
+          className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
           rows={3}
           maxLength={5000}
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
         />
       </label>
-      <label>
+      <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
         Địa điểm hoặc liên kết tham gia
         <input
+          className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
           required
           maxLength={1000}
           value={form.location}
           onChange={(e) => set("location", e.target.value)}
         />
       </label>
-      <div className="live-two-col">
-        <label>
+      <div className="live-two-col grid grid-cols-2 max-[760px]:grid-cols-1 gap-[18px]">
+        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
           Bắt đầu
           <input
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
             required
             type="datetime-local"
             value={form.starts_at}
             onChange={(e) => set("starts_at", e.target.value)}
           />
         </label>
-        <label>
+        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
           Kết thúc
           <input
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
             required
             type="datetime-local"
             value={form.ends_at}
@@ -160,13 +175,14 @@ function EventEditor({ initial, busy, change, onClose }) {
           />
         </label>
       </div>
-      <p className="muted small">
+      <p className="muted small text-[9px] text-[var(--muted,#757185)] my-0">
         Giờ hiển thị theo múi giờ thiết bị:{" "}
         {Intl.DateTimeFormat().resolvedOptions().timeZone}.
       </p>
-      <label>
+      <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
         Số chỗ
         <input
+          className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
           required
           type="number"
           min={1}
@@ -176,13 +192,18 @@ function EventEditor({ initial, busy, change, onClose }) {
         />
       </label>
       {error && (
-        <p className="live-error" role="alert">
+        <p
+          className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] mb-[18px] leading-[1.8]"
+          role="alert"
+        >
           {error}
         </p>
       )}
-      <Button type="submit" disabled={busy}>
-        {busy ? "Đang lưu…" : "Lưu lịch học"}
-      </Button>
+      <div className="self-start">
+        <Button type="submit" disabled={busy}>
+          {busy ? "Đang lưu…" : "Lưu lịch học"}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -191,7 +212,12 @@ function Location({ value }) {
     const url = new URL(value);
     if (["http:", "https:"].includes(url.protocol))
       return (
-        <a href={url.href} target="_blank" rel="noopener noreferrer">
+        <a
+          className="text-[#496740] font-medium hover:underline"
+          href={url.href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {value} ↗
         </a>
       );
@@ -200,22 +226,30 @@ function Location({ value }) {
   }
   return <span>{value}</span>;
 }
-export function Calendar({ state, mutate, busy }) {
+export function Calendar({
+  state,
+  mutate,
+  busy,
+}: {
+  state: any;
+  mutate: any;
+  busy: boolean;
+}) {
   const resource = useSocial("/events", state, mutate);
-  const [editor, setEditor] = useState(null);
+  const [editor, setEditor] = useState<any>(null);
   const [filter, setFilter] = useState("upcoming");
-  const [cancel, setCancel] = useState(null);
+  const [cancel, setCancel] = useState<any>(null);
   const [downloading, setDownloading] = useState(false);
   const canCreate = ["admin", "instructor"].includes(state.user.role);
   const items = (resource.data?.events || []).filter(
-    (event) =>
+    (event: any) =>
       filter === "all" ||
       (filter === "mine"
         ? event.enrolled
         : event.status === "scheduled" &&
           Date.parse(event.ends_at) > Date.now()),
   );
-  async function download(event) {
+  async function download(event: any) {
     setDownloading(true);
     resource.setError("");
     try {
@@ -230,7 +264,7 @@ export function Calendar({ state, mutate, busy }) {
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) {
+    } catch (error: any) {
       resource.setError(error.message);
     } finally {
       setDownloading(false);
@@ -238,11 +272,15 @@ export function Calendar({ state, mutate, busy }) {
   }
   return (
     <>
-      <div className="between live-page-heading">
+      <div className="between live-page-heading flex items-center justify-between gap-4 mb-7">
         <div>
-          <span className="live-eyebrow">HỌC CÙNG NHAU</span>
-          <h1>Lịch học</h1>
-          <p className="muted">
+          <span className="live-eyebrow block text-[10px] uppercase tracking-[2px] font-semibold text-[#8b7ba8] mb-1">
+            HỌC CÙNG NHAU
+          </span>
+          <h1 className="text-[28px] max-[760px]:text-[24px] font-bold text-[#1f1b2d] my-1 tracking-tight">
+            Lịch học
+          </h1>
+          <p className="muted text-[11px] text-[var(--muted,#757185)]">
             Đăng ký buổi học, lưu lịch và theo dõi điểm danh.
           </p>
         </div>
@@ -265,16 +303,22 @@ export function Calendar({ state, mutate, busy }) {
           onClose={() => setEditor(null)}
         />
       )}
-      <div className="live-filters">
-        <label className="social-filter">
+      <div className="live-filters flex items-center flex-wrap gap-[14px] mb-[25px]">
+        <label className="social-filter flex items-center gap-[12px] text-[12px] text-[#555064]">
           Hiển thị
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <select
+            className="border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          >
             <option value="upcoming">Sắp diễn ra</option>
             <option value="mine">Đã đăng ký</option>
             <option value="all">Tất cả lịch học</option>
           </select>
         </label>
-        <span className="muted">{items.length} buổi học</span>
+        <span className="muted text-[11px] text-[var(--muted,#757185)]">
+          {items.length} buổi học
+        </span>
       </div>
       <LoadState resource={resource} />
       {resource.data && !items.length && (
@@ -287,7 +331,7 @@ export function Calendar({ state, mutate, busy }) {
           }
         />
       )}
-      <div className="stack">
+      <div className="stack space-y-4">
         {items.map((event) => {
           const future = Date.parse(event.starts_at) > Date.now(),
             cancelled = event.status === "cancelled";
@@ -296,14 +340,23 @@ export function Calendar({ state, mutate, busy }) {
             (state.user.role === "instructor" &&
               event.owner_id === state.user.id);
           return (
-            <article className="live-panel social-event" key={event.id}>
-              <div className="social-event-date">
-                <strong>{new Date(event.starts_at).getDate()}</strong>
-                <span>Tháng {new Date(event.starts_at).getMonth() + 1}</span>
-                <small>{new Date(event.starts_at).getFullYear()}</small>
+            <article
+              className="live-panel social-event bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] max-[760px]:p-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex gap-[24px] max-[650px]:flex-col items-start"
+              key={event.id}
+            >
+              <div className="social-event-date min-w-[80px] p-[16px_12px] rounded-[18px] bg-[#eef1e9] text-[#42593c] grid text-center gap-1 shrink-0">
+                <strong className="text-[32px] font-bold leading-none">
+                  {new Date(event.starts_at).getDate()}
+                </strong>
+                <span className="text-[12px]">
+                  Tháng {new Date(event.starts_at).getMonth() + 1}
+                </span>
+                <small className="text-[12px]">
+                  {new Date(event.starts_at).getFullYear()}
+                </small>
               </div>
-              <div className="social-event-content">
-                <div className="social-tags">
+              <div className="social-event-content min-w-0 flex-1">
+                <div className="social-tags flex gap-[8px] flex-wrap mb-2">
                   <Badge color={cancelled ? "rose" : "green"}>
                     {cancelled
                       ? "Đã hủy"
@@ -321,21 +374,29 @@ export function Calendar({ state, mutate, busy }) {
                     <Badge color="rose">Vắng mặt</Badge>
                   )}
                 </div>
-                <h2>{event.title}</h2>
-                <p className="live-prose">{event.description}</p>
-                <p className="muted">
+                <h2 className="text-[18px] font-bold text-[#1f1b2d] mt-[14px] mb-[10px]">
+                  {event.title}
+                </h2>
+                <p className="live-prose text-[12px] text-[#555064] whitespace-pre-wrap break-words leading-[1.95] mb-2">
+                  {event.description}
+                </p>
+                <p className="muted text-[11px] text-[var(--muted,#757185)] flex items-center gap-1.5 mb-1">
                   <Icon name="Clock" size={15} /> {dateLabel(event.starts_at)} –{" "}
                   {dateLabel(event.ends_at)}
                 </p>
-                <p className="social-location">
-                  <Icon name="ExternalLink" size={15} />{" "}
+                <p className="social-location break-words flex gap-[6px] items-baseline text-[12px] text-[#555064] mb-1">
+                  <Icon
+                    className="shrink-0 text-[#496740]"
+                    name="ExternalLink"
+                    size={15}
+                  />{" "}
                   <Location value={event.location} />
                 </p>
-                <p className="muted">
+                <p className="muted text-[11px] text-[var(--muted,#757185)] mb-4">
                   {event.owner_name} · {event.attendee_count}/{event.capacity}{" "}
                   người đăng ký
                 </p>
-                <div className="live-row-actions">
+                <div className="live-row-actions flex flex-wrap gap-[10px]">
                   {!cancelled &&
                     future &&
                     (event.enrolled ? (
@@ -402,11 +463,14 @@ export function Calendar({ state, mutate, busy }) {
                     )}
                 </div>
                 {cancel === event.id && (
-                  <div className="social-confirm" role="alert">
-                    <p>
+                  <div
+                    className="social-confirm bg-[#fbf0eb] border border-[#edcdc0] rounded-[12px] p-[14px] my-[16px]"
+                    role="alert"
+                  >
+                    <p className="text-[12px] text-[#8c3e29] font-medium mt-0 mb-3">
                       Hủy “{event.title}”? Người đã đăng ký sẽ nhận thông báo.
                     </p>
-                    <div className="live-row-actions">
+                    <div className="live-row-actions flex flex-wrap gap-[10px]">
                       <Button
                         disabled={busy}
                         onClick={async () => {
@@ -434,20 +498,25 @@ export function Calendar({ state, mutate, busy }) {
                   </div>
                 )}
                 {manage && (
-                  <details className="social-roster">
-                    <summary>
+                  <details className="social-roster mt-[20px] border-t border-[var(--border,#e9eaf0)] pt-[16px]">
+                    <summary className="cursor-pointer font-semibold text-[11px] text-[#1f1b2d]">
                       Danh sách đăng ký ({event.attendee_count})
                     </summary>
                     {!event.attendees?.length ? (
-                      <p className="muted">Chưa có người đăng ký.</p>
+                      <p className="muted text-[11px] text-[var(--muted,#757185)] mt-2">
+                        Chưa có người đăng ký.
+                      </p>
                     ) : (
                       event.attendees.map((attendee) => (
                         <div
-                          className="between social-attendee"
+                          className="between social-attendee flex items-center justify-between py-[12px] gap-[12px] border-b border-[#f2f1f5]"
                           key={attendee.user_id}
                         >
-                          <span>{attendee.name}</span>
+                          <span className="text-[12px] font-medium text-[#1f1b2d]">
+                            {attendee.name}
+                          </span>
                           <select
+                            className="max-w-[180px] border border-[var(--border,#e9eaf0)] rounded-[8px] p-1.5 text-[11px]"
                             aria-label={`Điểm danh ${attendee.name}`}
                             value={attendee.attendance}
                             disabled={busy || future || cancelled}
@@ -468,7 +537,7 @@ export function Calendar({ state, mutate, busy }) {
                       ))
                     )}
                     {future && (
-                      <p className="muted small">
+                      <p className="muted small text-[9px] text-[var(--muted,#757185)] mt-2">
                         Điểm danh mở khi buổi học bắt đầu.
                       </p>
                     )}
@@ -500,13 +569,19 @@ function CommunityPost({ post, user, change, busy }) {
       setReply("");
   }
   return (
-    <article className="live-panel social-post">
-      <div className="between">
-        <div className="social-author">
-          <span className="live-avatar">{post.author_name.slice(0, 1)}</span>
+    <article className="live-panel social-post bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] max-[760px]:p-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+      <div className="between flex items-center justify-between gap-4">
+        <div className="social-author flex items-center gap-[12px]">
+          <span className="live-avatar w-10 h-10 rounded-full bg-[#f0ebf9] text-[#74609f] font-bold flex items-center justify-center text-[14px]">
+            {post.author_name.slice(0, 1)}
+          </span>
           <div>
-            <strong>{post.author_name}</strong>
-            <small className="muted">{dateLabel(post.created_at)}</small>
+            <strong className="text-[13px] text-[#1f1b2d] font-semibold">
+              {post.author_name}
+            </strong>
+            <small className="muted block text-[9px] text-[var(--muted,#757185)] mt-0.5">
+              {dateLabel(post.created_at)}
+            </small>
           </div>
         </div>
         {canDelete && (
@@ -520,9 +595,11 @@ function CommunityPost({ post, user, change, busy }) {
         )}
       </div>
       {deleting && (
-        <div className="social-confirm">
-          <p>Xóa bài viết và tất cả phản hồi?</p>
-          <div className="live-row-actions">
+        <div className="social-confirm bg-[#fbf0eb] border border-[#edcdc0] rounded-[12px] p-[14px] my-[16px]">
+          <p className="text-[12px] text-[#8c3e29] font-medium mt-0 mb-3">
+            Xóa bài viết và tất cả phản hồi?
+          </p>
+          <div className="live-row-actions flex flex-wrap gap-[10px]">
             <Button
               disabled={busy}
               onClick={() =>
@@ -542,8 +619,10 @@ function CommunityPost({ post, user, change, busy }) {
           </div>
         </div>
       )}
-      <p className="live-prose social-post-body">{post.body}</p>
-      <div className="social-post-actions">
+      <p className="live-prose social-post-body text-[13px] text-[#332f42] whitespace-pre-wrap break-words leading-[1.95] my-[22px]">
+        {post.body}
+      </p>
+      <div className="social-post-actions flex items-center gap-[16px] border-t border-[var(--border,#e9eaf0)] pt-[12px]">
         <Button
           kind={post.liked ? "secondary" : "ghost"}
           aria-pressed={!!post.liked}
@@ -560,12 +639,19 @@ function CommunityPost({ post, user, change, busy }) {
         >
           {post.likes} lượt thích
         </Button>
-        <span className="muted">{post.replies.length} phản hồi</span>
+        <span className="muted text-[11px] text-[var(--muted,#757185)]">
+          {post.replies.length} phản hồi
+        </span>
       </div>
       {post.replies.map((item) => (
-        <div className="social-reply" key={item.id}>
-          <div className="between">
-            <strong>{item.author_name}</strong>
+        <div
+          className="social-reply mt-[14px] ml-[22px] max-[650px]:ml-[10px] p-[14px_18px] bg-[#f6f5f1] rounded-[12px] break-words"
+          key={item.id}
+        >
+          <div className="between flex items-center justify-between gap-4">
+            <strong className="text-[12px] text-[#1f1b2d] font-semibold">
+              {item.author_name}
+            </strong>
             {(user.role === "admin" || item.user_id === user.id) && (
               <Button
                 kind="ghost"
@@ -583,14 +669,22 @@ function CommunityPost({ post, user, change, busy }) {
               </Button>
             )}
           </div>
-          <p className="live-prose">{item.body}</p>
-          <small className="muted">{dateLabel(item.created_at)}</small>
+          <p className="live-prose text-[12px] text-[#4f4861] whitespace-pre-wrap break-words leading-[1.8] my-[8px]">
+            {item.body}
+          </p>
+          <small className="muted text-[9px] text-[var(--muted,#757185)]">
+            {dateLabel(item.created_at)}
+          </small>
         </div>
       ))}
-      <form className="live-form social-reply-form" onSubmit={submit}>
-        <label>
+      <form
+        className="live-form social-reply-form flex flex-col gap-[12px] mt-[20px]"
+        onSubmit={submit}
+      >
+        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
           Phản hồi bài viết của {post.author_name}
           <textarea
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px] bg-white"
             required
             maxLength={5000}
             rows={2}
@@ -599,9 +693,15 @@ function CommunityPost({ post, user, change, busy }) {
             placeholder="Chia sẻ kinh nghiệm hoặc đặt câu hỏi…"
           />
         </label>
-        <Button type="submit" kind="secondary" disabled={busy || !reply.trim()}>
-          Gửi phản hồi
-        </Button>
+        <div className="self-start">
+          <Button
+            type="submit"
+            kind="secondary"
+            disabled={busy || !reply.trim()}
+          >
+            Gửi phản hồi
+          </Button>
+        </div>
       </form>
     </article>
   );
@@ -621,17 +721,25 @@ export function Community({ state, mutate, busy }) {
   }
   return (
     <>
-      <div className="live-page-heading">
-        <span className="live-eyebrow">KẾT NỐI & CHIA SẺ</span>
-        <h1>Cộng đồng học tập</h1>
-        <p className="muted">
+      <div className="live-page-heading mb-7">
+        <span className="live-eyebrow block text-[10px] uppercase tracking-[2px] font-semibold text-[#8b7ba8] mb-1">
+          KẾT NỐI & CHIA SẺ
+        </span>
+        <h1 className="text-[28px] max-[760px]:text-[24px] font-bold text-[#1f1b2d] my-1 tracking-tight">
+          Cộng đồng học tập
+        </h1>
+        <p className="muted text-[11px] text-[var(--muted,#757185)]">
           Đặt câu hỏi, chia sẻ trải nghiệm và học từ đồng đội.
         </p>
       </div>
-      <form className="live-panel live-form social-editor" onSubmit={submit}>
-        <label>
+      <form
+        className="live-panel live-form social-editor bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] mb-[24px]"
+        onSubmit={submit}
+      >
+        <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
           Bạn muốn chia sẻ điều gì?
           <textarea
+            className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
             required
             rows={4}
             maxLength={10000}
@@ -640,8 +748,8 @@ export function Community({ state, mutate, busy }) {
             placeholder="Một điều vừa học được, một bài học thực tế…"
           />
         </label>
-        <div className="between">
-          <small className="muted">
+        <div className="between flex items-center justify-between gap-4 flex-wrap">
+          <small className="muted text-[9px] text-[var(--muted,#757185)]">
             Bài viết hiển thị với mọi thành viên trong không gian học tập.
           </small>
           <Button icon="Send" type="submit" disabled={busy || !body.trim()}>
@@ -656,7 +764,7 @@ export function Community({ state, mutate, busy }) {
           description="Bắt đầu cuộc trò chuyện bằng một trải nghiệm học tập của bạn."
         />
       )}
-      <div className="stack">
+      <div className="stack space-y-4">
         {resource.data?.posts.map((post) => (
           <CommunityPost
             key={post.id}
@@ -668,7 +776,7 @@ export function Community({ state, mutate, busy }) {
         ))}
       </div>
       {!!resource.data && (resource.data.total > 30 || offset > 0) && (
-        <div className="social-pagination">
+        <div className="social-pagination flex justify-center items-center gap-[16px] my-[24px]">
           <Button
             kind="secondary"
             disabled={busy || offset === 0}
@@ -676,7 +784,7 @@ export function Community({ state, mutate, busy }) {
           >
             Trang trước
           </Button>
-          <span>
+          <span className="text-[12px] text-[#555064]">
             Trang {offset / 30 + 1} · {resource.data.total} bài viết
           </span>
           <Button
@@ -703,11 +811,15 @@ export function Notifications({ state, go, mutate, busy }) {
   );
   return (
     <>
-      <div className="between live-page-heading">
+      <div className="between live-page-heading flex items-center justify-between gap-4 mb-7">
         <div>
-          <span className="live-eyebrow">THEO DÕI HOẠT ĐỘNG</span>
-          <h1>Thông báo</h1>
-          <p className="muted">
+          <span className="live-eyebrow block text-[10px] uppercase tracking-[2px] font-semibold text-[#8b7ba8] mb-1">
+            THEO DÕI HOẠT ĐỘNG
+          </span>
+          <h1 className="text-[28px] max-[760px]:text-[24px] font-bold text-[#1f1b2d] my-1 tracking-tight">
+            Thông báo
+          </h1>
+          <p className="muted text-[11px] text-[var(--muted,#757185)]">
             {resource.data?.unread || 0} chưa đọc · Cập nhật học tập và nhắc
             lịch trong ứng dụng.
           </p>
@@ -727,9 +839,10 @@ export function Notifications({ state, go, mutate, busy }) {
           Đọc tất cả
         </Button>
       </div>
-      <div className="live-filters">
-        <label className="social-checkbox">
+      <div className="live-filters flex items-center gap-4 mb-5">
+        <label className="social-checkbox flex items-center gap-[9px] text-[12px] text-[#332f42] cursor-pointer">
           <input
+            className="w-auto accent-[#496740]"
             type="checkbox"
             checked={unreadOnly}
             onChange={(e) => setUnreadOnly(e.target.checked)}
@@ -744,28 +857,35 @@ export function Notifications({ state, go, mutate, busy }) {
           description="Thông báo xuất hiện khi có hoạt động liên quan đến bạn."
         />
       )}
-      <div className="stack">
+      <div className="stack space-y-4">
         {items.map((item) => (
           <article
             key={item.id}
-            className={
-              "live-panel social-notification " +
-              (!item.read_at ? "social-unread" : "")
-            }
+            className={`live-panel social-notification bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] max-[760px]:p-[20px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex gap-[18px] items-start ${
+              !item.read_at ? "social-unread border-l-4 border-l-[#70875b]" : ""
+            }`}
           >
-            <span className="social-notification-icon">
+            <span className="social-notification-icon p-[12px] bg-[#f0efe9] rounded-[14px] text-[#5a6748] shrink-0">
               <Icon
                 name={item.route === "calendar" ? "CalendarDays" : "Bell"}
                 size={22}
               />
             </span>
-            <div>
-              <p className="live-prose">{item.text}</p>
-              <small className="muted">{dateLabel(item.created_at)}</small>
-              {!item.read_at && (
-                <span className="social-unread-label">Chưa đọc</span>
-              )}
-              <div className="live-row-actions">
+            <div className="flex-1 min-w-0">
+              <p className="live-prose text-[13px] text-[#332f42] whitespace-pre-wrap break-words leading-[1.8] mt-0 mb-2">
+                {item.text}
+              </p>
+              <div className="flex items-center gap-3 mb-2">
+                <small className="muted text-[9px] text-[var(--muted,#757185)]">
+                  {dateLabel(item.created_at)}
+                </small>
+                {!item.read_at && (
+                  <span className="social-unread-label text-[11px] text-[#496740] font-semibold">
+                    Chưa đọc
+                  </span>
+                )}
+              </div>
+              <div className="live-row-actions flex flex-wrap gap-[10px] mt-[10px]">
                 {item.route && (
                   <Button
                     kind="ghost"

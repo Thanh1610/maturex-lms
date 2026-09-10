@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Empty } from "../ui.jsx";
-import { api, dateLabel } from "./api.js";
-import { IntegrationStatus } from "./Integrations.jsx";
+import { Button, Empty } from "../ui";
+import { api, dateLabel } from "./api";
+import { IntegrationStatus } from "./Integrations";
 
 function NotificationPreferences({ user, mutate, busy }) {
   const [enabled, setEnabled] = useState(true),
@@ -18,7 +18,7 @@ function NotificationPreferences({ user, mutate, busy }) {
       if (sequence !== loadSequence.current) return;
       setEnabled(result.preferences.email_notifications);
       setSaved(result.preferences.email_notifications);
-    } catch (error) {
+    } catch (error: any) {
       if (sequence === loadSequence.current) setError(error.message);
     } finally {
       if (sequence === loadSequence.current) setLoading(false);
@@ -44,26 +44,36 @@ function NotificationPreferences({ user, mutate, busy }) {
     }
   }
   return (
-    <form className="live-panel live-form" onSubmit={submit}>
-      <h2>Thông báo email</h2>
-      <p className="muted">
+    <form
+      className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px]"
+      onSubmit={submit}
+    >
+      <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-0">
+        Thông báo email
+      </h2>
+      <p className="muted text-[11px] text-[var(--muted,#757185)] mb-0">
         Nhận cập nhật học tập và nhắc lịch qua email khi dịch vụ email của không
         gian đã được kết nối.
       </p>
       {loading ? (
-        <p role="status">Đang tải tùy chọn…</p>
+        <p className="text-[12px] text-[var(--muted,#757185)]" role="status">
+          Đang tải tùy chọn…
+        </p>
       ) : error ? (
-        <div className="live-error" role="alert">
-          {error}
+        <div
+          className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] mb-[18px] leading-[1.8] flex items-center justify-between"
+          role="alert"
+        >
+          <span>{error}</span>
           <Button type="button" kind="ghost" onClick={load}>
             Thử lại
           </Button>
         </div>
       ) : (
         <>
-          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <label className="flex items-center gap-[10px] text-[12px] text-[#1f1b2d] font-normal cursor-pointer">
             <input
-              style={{ width: "auto" }}
+              className="w-auto h-4 w-4"
               type="checkbox"
               checked={enabled}
               disabled={busy}
@@ -71,13 +81,15 @@ function NotificationPreferences({ user, mutate, busy }) {
             />
             Nhận thông báo học tập qua email
           </label>
-          <small className="muted">
+          <small className="muted text-[9px] text-[var(--muted,#757185)] leading-relaxed">
             Thông báo trong ứng dụng vẫn được lưu. Hướng dẫn đặt lại mật khẩu
             được gửi khi bạn yêu cầu.
           </small>
-          <Button type="submit" disabled={busy || enabled === saved}>
-            Lưu tùy chọn
-          </Button>
+          <div className="self-start">
+            <Button type="submit" disabled={busy || enabled === saved}>
+              Lưu tùy chọn
+            </Button>
+          </div>
         </>
       )}
     </form>
@@ -92,7 +104,7 @@ const auditActions = {
   "path.assign": "Giao lộ trình học",
 };
 function AuditLog() {
-  const [entries, setEntries] = useState(null),
+  const [entries, setEntries] = useState<any>(null),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false);
   const load = useCallback(async () => {
@@ -100,7 +112,7 @@ function AuditLog() {
     setError("");
     try {
       setEntries((await api("/audit")).entries);
-    } catch (error) {
+    } catch (error: any) {
       setError(error.message);
     } finally {
       setLoading(false);
@@ -110,11 +122,13 @@ function AuditLog() {
     load();
   }, [load]);
   return (
-    <section className="live-panel">
-      <div className="between">
+    <section className="live-panel bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+      <div className="between flex items-center justify-between gap-4 mb-4">
         <div>
-          <h2>Nhật ký quản trị</h2>
-          <p className="muted">
+          <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-1">
+            Nhật ký quản trị
+          </h2>
+          <p className="muted text-[11px] text-[var(--muted,#757185)] mb-0">
             200 hoạt động gần nhất, theo thời gian mới nhất.
           </p>
         </div>
@@ -123,11 +137,18 @@ function AuditLog() {
         </Button>
       </div>
       {error && (
-        <p className="live-error" role="alert">
+        <p
+          className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] mb-[18px] leading-[1.8]"
+          role="alert"
+        >
           {error}
         </p>
       )}
-      {loading && !entries && <p role="status">Đang tải nhật ký…</p>}
+      {loading && !entries && (
+        <p className="text-[12px] text-[var(--muted,#757185)]" role="status">
+          Đang tải nhật ký…
+        </p>
+      )}
       {entries?.length === 0 && (
         <Empty
           title="Chưa có hoạt động quản trị"
@@ -135,22 +156,13 @@ function AuditLog() {
         />
       )}
       {!!entries?.length && (
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              textAlign: "left",
-            }}
-          >
-            <caption
-              className="muted"
-              style={{ textAlign: "left", paddingBottom: 12 }}
-            >
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <caption className="muted text-left pb-3 text-[11px] text-[var(--muted,#757185)]">
               Lịch sử thay đổi tài khoản và giao lộ trình
             </caption>
             <thead>
-              <tr>
+              <tr className="bg-[#fcfcfd] border-b border-[var(--border,#e9eaf0)]">
                 {[
                   "Thời gian",
                   "Người thực hiện",
@@ -160,10 +172,7 @@ function AuditLog() {
                   <th
                     scope="col"
                     key={label}
-                    style={{
-                      padding: "12px 10px",
-                      borderBottom: "1px solid #e5e5df",
-                    }}
+                    className="p-[12px_10px] text-[10px] font-medium text-[var(--muted,#757185)] whitespace-nowrap border-b border-[#e5e5df]"
                   >
                     {label}
                   </th>
@@ -172,19 +181,20 @@ function AuditLog() {
             </thead>
             <tbody>
               {entries.map((entry) => (
-                <tr key={entry.id}>
-                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                <tr
+                  className="border-b border-[#f2f1f5] hover:bg-[#faf9fc]"
+                  key={entry.id}
+                >
+                  <td className="p-[12px_10px] text-[11px] whitespace-nowrap text-[#555064]">
                     {dateLabel(entry.created_at)}
                   </td>
-                  <td style={{ padding: "12px 10px" }}>
+                  <td className="p-[12px_10px] text-[11px] font-medium text-[#1f1b2d]">
                     {entry.actor_name || "Hệ thống"}
                   </td>
-                  <td style={{ padding: "12px 10px" }}>
+                  <td className="p-[12px_10px] text-[11px] text-[#555064]">
                     {auditActions[entry.action] || entry.action}
                   </td>
-                  <td
-                    style={{ padding: "12px 10px", overflowWrap: "anywhere" }}
-                  >
+                  <td className="p-[12px_10px] text-[11px] text-[#757185] break-words">
                     {entry.target_id || "—"}
                   </td>
                 </tr>
@@ -209,7 +219,7 @@ export function Settings({ state, mutate, busy }) {
       "Đã lưu hồ sơ.",
     );
   }
-  async function password(e) {
+  async function password(e: any) {
     e.preventDefault();
     setSaving(true);
     setError("");
@@ -217,7 +227,7 @@ export function Settings({ state, mutate, busy }) {
     try {
       await api("/account/password", "POST", values);
       location.assign("/");
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message);
     } finally {
       setSaving(false);
@@ -225,47 +235,71 @@ export function Settings({ state, mutate, busy }) {
   }
   return (
     <>
-      <div className="live-page-heading">
-        <h1>Cài đặt tài khoản</h1>
-        <p className="muted">Thông tin cá nhân, bảo mật và dịch vụ kết nối.</p>
+      <div className="live-page-heading mb-7">
+        <h1 className="text-[28px] max-[760px]:text-[24px] font-bold text-[#1f1b2d] my-1 tracking-tight">
+          Cài đặt tài khoản
+        </h1>
+        <p className="muted text-[11px] text-[var(--muted,#757185)]">
+          Thông tin cá nhân, bảo mật và dịch vụ kết nối.
+        </p>
       </div>
-      <div className="live-two-col">
-        <form className="live-panel live-form" onSubmit={profile}>
-          <h2>Hồ sơ của bạn</h2>
-          <label>
+      <div className="live-two-col grid grid-cols-2 max-[760px]:grid-cols-1 gap-[18px]">
+        <form
+          className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px]"
+          onSubmit={profile}
+        >
+          <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-0">
+            Hồ sơ của bạn
+          </h2>
+          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
             Họ và tên
             <input
+              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
               name="name"
               defaultValue={state.user.name}
               required
               maxLength={100}
             />
           </label>
-          <label>
+          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
             Chức danh
-            <input name="job" defaultValue={state.user.job} maxLength={150} />
+            <input
+              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+              name="job"
+              defaultValue={state.user.job}
+              maxLength={150}
+            />
           </label>
-          <p className="muted">
+          <p className="muted text-[11px] text-[var(--muted,#757185)] leading-relaxed">
             {state.user.email}
             <br />
             Nhóm: {state.user.team || "Chưa được phân nhóm"}
           </p>
-          <Button disabled={busy}>Lưu hồ sơ</Button>
+          <div className="self-start">
+            <Button disabled={busy}>Lưu hồ sơ</Button>
+          </div>
         </form>
-        <form className="live-panel live-form" onSubmit={password}>
-          <h2>Đổi mật khẩu</h2>
-          <label>
+        <form
+          className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px]"
+          onSubmit={password}
+        >
+          <h2 className="text-[18px] font-bold text-[#1f1b2d] mb-0">
+            Đổi mật khẩu
+          </h2>
+          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
             Mật khẩu hiện tại
             <input
+              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
               type="password"
               name="currentPassword"
               required
               autoComplete="current-password"
             />
           </label>
-          <label>
+          <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
             Mật khẩu mới
             <input
+              className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
               type="password"
               name="newPassword"
               required
@@ -274,40 +308,51 @@ export function Settings({ state, mutate, busy }) {
               autoComplete="new-password"
             />
           </label>
-          <small className="muted">
+          <small className="muted text-[9px] text-[var(--muted,#757185)]">
             Đổi mật khẩu sẽ đăng xuất các phiên đang mở.
           </small>
           {error && (
-            <p className="live-error" role="alert">
+            <p
+              className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] leading-[1.8]"
+              role="alert"
+            >
               {error}
             </p>
           )}
-          <Button disabled={saving}>Đổi mật khẩu</Button>
+          <div className="self-start">
+            <Button disabled={saving}>Đổi mật khẩu</Button>
+          </div>
         </form>
       </div>
-      <div className="space-top">
+      <div className="space-top mt-5">
         <NotificationPreferences
           user={state.user}
           mutate={mutate}
           busy={busy}
         />
       </div>
-      <div className="space-top">
+      <div className="space-top mt-5">
         <IntegrationStatus state={state} />
       </div>
       {state.user.role === "admin" && (
-        <div className="space-top">
+        <div className="space-top mt-5">
           <AuditLog />
         </div>
       )}
     </>
   );
 }
-export function PasswordRecovery({ token, onDone }) {
+export function PasswordRecovery({
+  token,
+  onDone,
+}: {
+  token?: string;
+  onDone?: () => void;
+}) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
-  async function submit(e) {
+  async function submit(e: any) {
     e.preventDefault();
     setBusy(true);
     setError("");
@@ -321,28 +366,32 @@ export function PasswordRecovery({ token, onDone }) {
       setMessage(
         token ? "Đã đặt lại mật khẩu. Bạn có thể đăng nhập." : result.message,
       );
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message);
     } finally {
       setBusy(false);
     }
   }
   return (
-    <div className="live-loading">
+    <div className="live-loading min-h-screen flex items-center justify-center flex-col p-[30px]">
       <form
-        className="live-panel live-form"
+        className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] w-full max-w-[460px]"
         onSubmit={submit}
-        style={{ width: "100%", maxWidth: 460 }}
       >
-        <h1>{token ? "Đặt lại mật khẩu" : "Quên mật khẩu"}</h1>
+        <h1 className="text-[24px] font-bold text-[#1f1b2d] mb-1">
+          {token ? "Đặt lại mật khẩu" : "Quên mật khẩu"}
+        </h1>
         {message ? (
-          <p role="status">{message}</p>
+          <p className="text-[12px] text-[#3b7c53]" role="status">
+            {message}
+          </p>
         ) : (
           <>
             {token ? (
-              <label>
+              <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
                 Mật khẩu mới
                 <input
+                  className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
                   type="password"
                   name="password"
                   required
@@ -352,28 +401,41 @@ export function PasswordRecovery({ token, onDone }) {
                 />
               </label>
             ) : (
-              <label>
+              <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
                 Email tài khoản
-                <input type="email" name="email" required maxLength={254} />
+                <input
+                  className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
+                  type="email"
+                  name="email"
+                  required
+                  maxLength={254}
+                />
               </label>
             )}
             {error && (
-              <p className="live-error" role="alert">
+              <p
+                className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] leading-[1.8]"
+                role="alert"
+              >
                 {error}
               </p>
             )}
-            <Button disabled={busy}>
-              {busy
-                ? "Đang xử lý…"
-                : token
-                  ? "Lưu mật khẩu mới"
-                  : "Gửi hướng dẫn"}
-            </Button>
+            <div className="self-start">
+              <Button disabled={busy}>
+                {busy
+                  ? "Đang xử lý…"
+                  : token
+                    ? "Lưu mật khẩu mới"
+                    : "Gửi hướng dẫn"}
+              </Button>
+            </div>
           </>
         )}
-        <Button type="button" kind="ghost" onClick={onDone}>
-          Về đăng nhập
-        </Button>
+        <div className="self-start">
+          <Button type="button" kind="ghost" onClick={onDone}>
+            Về đăng nhập
+          </Button>
+        </div>
       </form>
     </div>
   );

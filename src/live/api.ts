@@ -1,5 +1,13 @@
-export async function api(path, method = "GET", body) {
-  let response;
+export interface ApiError extends Error {
+  status?: number;
+}
+
+export async function api<T = any>(
+  path: string,
+  method = "GET",
+  body?: any,
+): Promise<T> {
+  let response: Response;
   try {
     response = await fetch(`/api${path}`, {
       method,
@@ -12,7 +20,7 @@ export async function api(path, method = "GET", body) {
       "Không kết nối được máy chủ. Nội dung đang nhập vẫn được giữ; hãy thử lại khi có kết nối.",
     );
   }
-  let data;
+  let data: any;
   try {
     data = await response.json();
   } catch {
@@ -23,7 +31,9 @@ export async function api(path, method = "GET", body) {
   if (!response.ok) {
     if (response.status === 401 && path !== "/login")
       window.dispatchEvent(new Event("lms:unauthorized"));
-    const error = new Error(data.error || "Không thực hiện được yêu cầu.");
+    const error: ApiError = new Error(
+      data.error || "Không thực hiện được yêu cầu.",
+    );
     error.status = response.status;
     throw error;
   }
@@ -44,4 +54,5 @@ export const statusLabels = {
   revision: "Cần bổ sung",
   approved: "Đã đạt",
 };
-export const dateLabel = (value) => new Date(value).toLocaleString("vi-VN");
+export const dateLabel = (value: string | number | Date) =>
+  new Date(value).toLocaleString("vi-VN");

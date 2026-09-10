@@ -1,10 +1,11 @@
-import { initialState } from "./data.js";
+import { initialState } from "./data";
+import type { AppState } from "./types/index";
 export const STORAGE_KEY = "maturex-lms-demo-v1";
-function enrollCourse(s, id, person = "me", due = "25/09/2026") {
-  const c = s.courses.find((c) => c.id === id);
+function enrollCourse(s: any, id: string, person = "me", due = "25/09/2026") {
+  const c = s.courses.find((c: any) => c.id === id);
   if (!c) return;
   if (person === "me" && !s.enrolled.includes(id)) s.enrolled.push(id);
-  if (!s.assignments.some((a) => a.course === id && a.person === person)) {
+  if (!s.assignments.some((a: any) => a.course === id && a.person === person)) {
     s.assignments.push({
       id: `task-${person}-${id}`,
       course: id,
@@ -20,13 +21,13 @@ function enrollCourse(s, id, person = "me", due = "25/09/2026") {
     });
   }
 }
-export function progress(state, id) {
-  const c = state.courses.find((c) => c.id === id);
+export function progress(state: any, id: string): number {
+  const c = state.courses.find((c: any) => c.id === id);
   return c
     ? Math.round(((state.completed[id]?.length || 0) / c.lessons.length) * 100)
     : 0;
 }
-export function transition(state, action) {
+export function transition(state: any, action: any): any {
   const s = structuredClone(state);
   const { type, id, value } = action;
   switch (type) {
