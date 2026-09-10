@@ -256,7 +256,10 @@ export function LessonTools({
   const [data, setData] = useState<LearningData | null>(null);
   const [note, setNote] = useState("");
   const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState<{ passed: boolean; explanation: string } | null>(null);
+  const [result, setResult] = useState<{
+    passed: boolean;
+    explanation: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);

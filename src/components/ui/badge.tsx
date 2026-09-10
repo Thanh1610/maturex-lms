@@ -44,10 +44,9 @@ function Badge({
   children,
   ...props
 }: BadgeProps) {
-  const resolvedVariant =
-    (variant || color || "default") as VariantProps<
-      typeof badgeVariants
-    >["variant"];
+  const resolvedVariant = (variant || color || "default") as VariantProps<
+    typeof badgeVariants
+  >["variant"];
 
   return (
     <span
