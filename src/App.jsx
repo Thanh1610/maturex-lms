@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { initialState, normalize, paths, people } from "./data.js";
 import {
   Assignments,
@@ -22,7 +22,6 @@ import { STORAGE_KEY, transition } from "./store.js";
 import {
   AppContext,
   Avatar,
-  Badge,
   Button,
   Empty,
   Icon,
@@ -143,7 +142,7 @@ function GlobalSearch() {
       .map((c) => ({
         name: c.title,
         sub: c.category,
-        route: "course/" + c.id,
+        route: `course/${c.id}`,
         icon: c.icon,
       })),
     ...[...paths, ...(state.customPaths || [])].map((p) => ({
@@ -155,12 +154,12 @@ function GlobalSearch() {
     ...(role === "manager"
       ? people.map((p) => ({
           name: p.name,
-          sub: p.job + " · " + p.team,
+          sub: `${p.job} · ${p.team}`,
           route: "team",
           icon: "Users",
         }))
       : []),
-  ].filter((x) => normalize(x.name + " " + x.sub).includes(n));
+  ].filter((x) => normalize(`${x.name} ${x.sub}`).includes(n));
   return (
     <>
       <div className="search-input large">
@@ -305,7 +304,7 @@ export default function App() {
   }, [toast]);
   const active = route.split("/")[0];
   useEffect(() => {
-    document.title = (titles[active] || "Bài học") + " · MatureX Learning";
+    document.title = `${titles[active] || "Bài học"} · MatureX Learning`;
   }, [active]);
   const selectRole = (value) => {
     setRole(value);

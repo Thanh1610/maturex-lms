@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Empty, Icon } from "../ui.jsx";
 import { Admin } from "./Admin.jsx";
 import { Assignments, Evidence } from "./Assessment.jsx";
@@ -206,7 +206,7 @@ function Dashboard({ state, go }) {
               <button
                 className="live-panel live-resume"
                 key={course.id}
-                onClick={() => go("course/" + course.id)}
+                onClick={() => go(`course/${course.id}`)}
               >
                 <Badge>{course.category}</Badge>
                 <h3>{course.title}</h3>
@@ -367,9 +367,8 @@ export default function LiveApp() {
   ];
   const active = route.split("/")[0];
   useEffect(() => {
-    document.title =
-      (nav.find((n) => n[0] === active)?.[2] || "Khóa học") + " · MatureX LMS";
-  }, [active, state?.user.role]);
+    document.title = `${nav.find((n) => n[0] === active)?.[2] || "Khóa học"} · MatureX LMS`;
+  }, [active, nav.find]);
   if (active === "forgot" || active === "reset")
     return (
       <PasswordRecovery
@@ -510,7 +509,7 @@ export default function LiveApp() {
               <button
                 key={key}
                 aria-label={title}
-                className={"nav-item " + (active === key ? "active" : "")}
+                className={`nav-item ${active === key ? "active" : ""}`}
                 onClick={() => go(key)}
                 aria-current={active === key ? "page" : undefined}
               >

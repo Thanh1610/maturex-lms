@@ -68,7 +68,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import React, { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 const icons = {
   ArrowUpRight,
@@ -355,8 +355,8 @@ export function CourseCard({ course, progress: done, compact = false }) {
     <article className={`course-card ${compact ? "compact" : ""}`}>
       <button
         className="cover-link"
-        onClick={() => go("course/" + course.id)}
-        aria-label={"Mở khóa học " + course.title}
+        onClick={() => go(`course/${course.id}`)}
+        aria-label={`Mở khóa học ${course.title}`}
       >
         <Cover course={course} />
       </button>
@@ -364,8 +364,8 @@ export function CourseCard({ course, progress: done, compact = false }) {
         className={`bookmark ${state.bookmarks.includes(course.id) ? "saved" : ""}`}
         aria-label={
           state.bookmarks.includes(course.id)
-            ? "Bỏ lưu " + course.title
-            : "Lưu " + course.title
+            ? `Bỏ lưu ${course.title}`
+            : `Lưu ${course.title}`
         }
         onClick={() => dispatch({ type: "bookmark", id: course.id })}
       >
@@ -378,7 +378,7 @@ export function CourseCard({ course, progress: done, compact = false }) {
         </div>
         <button
           className="title-link"
-          onClick={() => go("course/" + course.id)}
+          onClick={() => go(`course/${course.id}`)}
         >
           {course.title}
         </button>
@@ -401,7 +401,7 @@ export function CourseCard({ course, progress: done, compact = false }) {
               </span>
               <button
                 className="text-btn"
-                onClick={() => go("course/" + course.id)}
+                onClick={() => go(`course/${course.id}`)}
               >
                 {done === 100 ? "Xem lại" : "Tiếp tục học"}
                 <Icon name="ArrowRight" size={15} />

@@ -514,7 +514,7 @@
     margin-top: 6px;
   }
   .integration-chat {
-    padding: 0 !important;
+    padding: 0;
     overflow: hidden;
   }
   .integration-chat-header {
@@ -590,7 +590,7 @@
   }
   .integration-notice {
     margin-bottom: 22px;
-    background: #fffaf0 !important;
+    background: #fffaf0;
   }
   .integration-cards {
     display: grid;
