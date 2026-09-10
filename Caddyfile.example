@@ -1,0 +1,10 @@
+# Replace this hostname with the public hostname also set in APP_ORIGIN.
+# Run Caddy on the Docker host; keep app port 3001 bound to loopback.
+lms.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3001
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+}

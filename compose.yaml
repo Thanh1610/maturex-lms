@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    image: mx-lms:local
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      APP_HOST: 0.0.0.0
+      API_PORT: 3001
+      SERVE_STATIC: "1"
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN to your public HTTPS origin in .env}
+      LMS_DATABASE: ${LMS_DATABASE:-/data/lms.sqlite}
+      LMS_UPLOADS: ${LMS_UPLOADS:-/data/uploads}
+      LMS_ALLOW_SETUP: ${LMS_ALLOW_SETUP:-0}
+    ports:
+      - "127.0.0.1:${LMS_HTTP_PORT:-3001}:3001"
+    volumes:
+      - lms_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  lms_data:
+    name: ${LMS_VOLUME:-mx-lms-data}

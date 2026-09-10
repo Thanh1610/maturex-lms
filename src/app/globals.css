@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-be-vietnam-pro), sans-serif;
+
+  /* Brand Colors */
+  --color-purple: #6b57bd;
+  --color-purple-dark: #4b3c88;
+  --color-purple-light: #efebfb;
+  --color-purple-hover: #5c49ad;
+  --color-purple-text: #7661b3;
+  --color-muted: #858894;
+  --color-border: #e9eaf0;
+  --color-surface: #ffffff;
+  --color-surface-bg: #f8f9fb;
+  --color-green: #448171;
+  --color-green-text: #398572;
+  --color-green-bg: #e6f0e9;
+  --color-mint-text: #c1decf;
+  --color-peach-text: #b88861;
+  --color-peach-bg: #faf0e7;
+  --color-blue-text: #637da4;
+  --color-blue-bg: #eaf0f9;
+  --color-pink-text: #a36e8b;
+  --color-pink-bg: #f5e9ef;
+  --color-sand-text: #9a8b59;
+  --color-sand-bg: #f5f0df;
+  --color-gray-text: #777d8a;
+  --color-gray-bg: #f1f2f5;
+
+  /* Shadows */
+  --shadow-subtle: 0 4px 22px #29233d05;
+  --shadow-btn: 0 3px 5px #6b57bd15;
+}
+
+/* Palette utility classes mapping exactly to MatureX visual tokens */
+.lavender {
+  background-color: var(--color-purple-light);
+  color: var(--color-purple-text);
+}
+.green {
+  background-color: var(--color-green-bg);
+  color: var(--color-green-text);
+}
+.peach {
+  background-color: var(--color-peach-bg);
+  color: var(--color-peach-text);
+}
+.blue {
+  background-color: var(--color-blue-bg);
+  color: var(--color-blue-text);
+}
+.pink {
+  background-color: var(--color-pink-bg);
+  color: var(--color-pink-text);
+}
+.sand {
+  background-color: var(--color-sand-bg);
+  color: var(--color-sand-text);
+}
+.gray {
+  background-color: var(--color-gray-bg);
+  color: var(--color-gray-text);
+}
+.white {
+  background-color: rgba(255, 255, 255, 0.85);
+  color: #67568a;
+}

@@ -1,0 +1,33 @@
+{
+  "name": "lms-maturex",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:all": "node --env-file-if-exists=.env tools/dev.mjs",
+    "server": "node server/index.js",
+    "backup": "node --env-file-if-exists=.env tools/backup.mjs",
+    "restore": "node tools/restore.mjs",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome check --write ."
+  },
+  "dependencies": {
+    "lucide-react": "^1.43.0",
+    "next": "16.3.4",
+    "nodemailer": "^10.0.1",
+    "openid-client": "^6.8.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@11.6.0"
+}
