@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { isIP } from "node:net";
 import { resolve, dirname } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -14,7 +14,6 @@ import {
 } from "./social";
 import { initOrganization, handleOrganization } from "./organization";
 import { initIntegrations, createIntegrations, type IntegrationsService } from "./integrations";
-import { serveStatic } from "./static";
 import { initJobs, runJobs } from "./jobs";
 import {
   initCourseTeams,
@@ -80,7 +79,7 @@ export interface CreateAppOptions {
   uploadsPath?: string;
   env?: NodeJS.ProcessEnv;
   enableWorkers?: boolean;
-  staticDir?: string | null;
+  staticHandler?: ((req: IncomingMessage, res: ServerResponse) => Promise<boolean> | boolean) | null;
 }
 
 export interface AppInstance {
@@ -99,7 +98,7 @@ export function createApp({
   ),
   env = process.env,
   enableWorkers = false,
-  staticDir = null,
+  staticHandler = null,
 }: CreateAppOptions = {}): AppInstance {
   const configuredOrigin = origin ? new URL(origin).origin : null;
   const secure = configuredOrigin?.startsWith("https:") || false;
@@ -178,8 +177,8 @@ export function createApp({
       const query = url.searchParams;
       const method = req.method || "GET";
 
-      if (staticDir && !path.startsWith("/api/")) {
-        if (await serveStatic(req, res, staticDir)) return;
+      if (staticHandler && !path.startsWith("/api/")) {
+        if (await staticHandler(req, res)) return;
         return send(404, { error: "Không tìm thấy trang." });
       }
 

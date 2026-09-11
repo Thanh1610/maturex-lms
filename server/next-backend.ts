@@ -7,17 +7,21 @@ const globalForBackend = globalThis as unknown as {
 
 export const getAppInstance = (): AppInstance => {
   if (!globalForBackend.backendApp) {
-    const databasePath = resolve(process.env.LMS_DATABASE || ".local/lms.sqlite");
+    const dbEnv = process.env.LMS_DATABASE;
+    const databasePath = dbEnv
+      ? resolve(/*turbopackIgnore: true*/ dbEnv)
+      : resolve(process.cwd(), ".local/lms.sqlite");
     const origin = process.env.APP_ORIGIN || "http://localhost:3000";
+    const uploadEnv = process.env.LMS_UPLOADS;
     globalForBackend.backendApp = createApp({
       databasePath,
       origin,
       allowSetup: process.env.LMS_ALLOW_SETUP === "1",
-      uploadsPath: process.env.LMS_UPLOADS
-        ? resolve(process.env.LMS_UPLOADS)
+      uploadsPath: uploadEnv
+        ? resolve(/*turbopackIgnore: true*/ uploadEnv)
         : undefined,
       enableWorkers: true,
-      staticDir: null,
+      staticHandler: null,
     });
   }
   return globalForBackend.backendApp;

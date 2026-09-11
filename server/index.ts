@@ -9,6 +9,8 @@ const origin =
   (serve ? `http://127.0.0.1:${port}` : "http://127.0.0.1:5173");
 const databasePath = resolve(process.env.LMS_DATABASE || ".local/lms.sqlite");
 
+import { serveStatic } from "./static";
+
 const { server, db, integrations } = createApp({
   databasePath,
   origin,
@@ -17,7 +19,9 @@ const { server, db, integrations } = createApp({
     ? resolve(process.env.LMS_UPLOADS)
     : undefined,
   enableWorkers: true,
-  staticDir: serve ? resolve("dist") : null,
+  staticHandler: serve
+    ? (req, res) => serveStatic(req, res, resolve("dist"))
+    : null,
 });
 
 server.listen(port, process.env.APP_HOST || "127.0.0.1", () =>
