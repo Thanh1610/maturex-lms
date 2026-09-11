@@ -13,6 +13,7 @@ export * from "./form-field";
 export * from "./icon";
 export * from "./input";
 export * from "./label";
+export * from "./loading-screen";
 export * from "./modal";
 export * from "./page-heading";
 export * from "./progress";

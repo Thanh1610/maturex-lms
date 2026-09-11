@@ -5,7 +5,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/demo.html",
-        destination: "/demo",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/demo",
+        destination: "/",
         permanent: true,
       },
     ];

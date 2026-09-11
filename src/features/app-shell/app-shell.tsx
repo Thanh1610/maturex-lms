@@ -1,9 +1,12 @@
+"use client";
+
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Badge, Button, Empty, Icon } from "@/components/ui";
 import { api, roleLabels } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/api-routes";
 import { ServiceIntegrations as Assistant } from "../admin/components/service-integrations";
 import { UserManagement as Admin } from "../admin/components/user-management";
 import {
@@ -11,6 +14,7 @@ import {
   Evidence,
 } from "../assessment/components/assessment-center";
 import { LoginForm } from "../auth/components/login-form";
+import { useAuthStore } from "../auth/stores/auth-store";
 import { ClassLinks } from "../cohorts/components/class-links";
 import { Cohorts } from "../cohorts/components/cohort-management";
 import {
@@ -23,10 +27,7 @@ import {
   Reports,
   Team,
 } from "../organization/components/organization-hub";
-import {
-  PasswordRecovery,
-  Settings,
-} from "../settings/components/account-settings";
+import { Settings } from "../settings/components/account-settings";
 import {
   Calendar,
   Community,
@@ -134,11 +135,6 @@ function Dashboard({ state, go }) {
 import type { ReactNode } from "react";
 import type { AppState, LiveUser } from "@/types";
 
-interface SessionData {
-  user: LiveUser | null;
-  setupRequired: boolean;
-}
-
 export interface LiveAppState extends AppState {
   user: LiveUser;
   unreadNotifications: number;
@@ -147,7 +143,9 @@ export interface LiveAppState extends AppState {
 
 export default function LiveApp() {
   const router = useRouter();
-  const [session, setSession] = useState<SessionData | null>(null);
+  const fetchMe = useAuthStore((s) => s.fetchMe);
+  const storeLogout = useAuthStore((s) => s.logout);
+  const [session, setSession] = useState<{ user: any } | null>(null);
   const [state, setState] = useState<LiveAppState | null>(null);
   const [route, setRoute] = useState(
     () =>
@@ -159,21 +157,20 @@ export default function LiveApp() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const reload = useCallback(async () => {
-    const data = await api<LiveAppState>("/state");
+    const data = await api<LiveAppState>(API_ROUTES.app.state);
     setState(data);
   }, []);
   const boot = useCallback(async () => {
     setError("");
     try {
-      const current = await api<SessionData>("/session");
-      setSession(current);
-      if (current.user) await reload();
+      const current = await fetchMe();
+      setSession({ user: current });
+      if (current) await reload();
       else setState(null);
-      setSession(current);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     }
-  }, [reload]);
+  }, [fetchMe, reload]);
   useEffect(() => {
     boot();
   }, [boot]);
@@ -235,9 +232,9 @@ export default function LiveApp() {
     if (busy) return;
     setBusy(true);
     try {
-      await api("/logout", "POST", {});
+      await storeLogout();
       setState(null);
-      setSession({ user: null, setupRequired: false });
+      setSession({ user: null });
       setError("");
       setNotice("");
       router.push("/auth/login");
@@ -277,16 +274,6 @@ export default function LiveApp() {
   useEffect(() => {
     document.title = `${nav.find((n) => n[0] === active)?.[2] || "Khóa học"} · MatureX LMS`;
   }, [active, nav.find]);
-  if (active === "forgot" || active === "reset")
-    return (
-      <PasswordRecovery
-        token={active === "reset" ? route.split("/")[1] : null}
-        onDone={() => {
-          go("home");
-          boot();
-        }}
-      />
-    );
   if (!session)
     return (
       <div className="live-loading">
@@ -463,10 +450,8 @@ export default function LiveApp() {
       </div>
       {reauth && (
         <LoginForm
-          resumeUser={state.user}
-          setup={false}
           onLogin={async () => {
-            const data = await api<LiveAppState>("/state");
+            const data = await api<LiveAppState>(API_ROUTES.app.state);
             if (data.user.id !== state.user.id)
               throw new Error(
                 "Tài khoản đã thay đổi. Hãy đăng nhập lại tài khoản đang soạn bài.",

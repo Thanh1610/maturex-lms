@@ -2,6 +2,7 @@ export interface ApiError extends Error {
   status?: number;
 }
 
+export * from "./api-routes";
 export * from "./formatters";
 
 export async function api<T = any>(
@@ -31,7 +32,7 @@ export async function api<T = any>(
     );
   }
   if (!response.ok) {
-    if (response.status === 401 && path !== "/login")
+    if (response.status === 401 && !path.startsWith("/auth"))
       window.dispatchEvent(new Event("lms:unauthorized"));
     const error: ApiError = new Error(
       data.error || "Không thực hiện được yêu cầu.",

@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useReducer, useState } from "react";
 import {
   AppContext,
@@ -58,8 +60,11 @@ const titles = Object.fromEntries(
   ].map((x) => [x[0], x[2]]),
 );
 function load() {
+  if (typeof window === "undefined") {
+    return initialState();
+  }
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     if (
       raw?.version === 1 &&
       Array.isArray(raw.courses) &&
@@ -138,8 +143,13 @@ import { NotificationList } from "./components/shared/notification-list";
 
 export default function App() {
   const [state, dispatch] = useReducer(transition, undefined, load);
-  const [route, setRoute] = useState(() => location.hash.slice(1) || "home");
+  const [route, setRoute] = useState(() =>
+    typeof window !== "undefined" && typeof window.location !== "undefined"
+      ? window.location.hash.slice(1) || "home"
+      : "home",
+  );
   const [role, setRole] = useState(() => {
+    if (typeof window === "undefined") return "learner";
     try {
       const saved = sessionStorage.getItem("mx-demo-role");
       return roles[saved] ? saved : "learner";
@@ -150,8 +160,10 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [mobile, setMobile] = useState(false);
-  const [narrow, setNarrow] = useState(
-    () => window.matchMedia("(max-width: 760px)").matches,
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(max-width: 760px)").matches
+      : false,
   );
   const [persistError, setPersistError] = useState(false);
   const close = useCallback(() => setModal(null), []);

@@ -1,25 +1,12 @@
-"use client";
+import type { Metadata } from "next";
+import PortalApp from "@/features/portal/portal-app";
 
-import dynamic from "next/dynamic";
+export const metadata: Metadata = {
+  title: "MatureX LMS - Nền tảng học tập & phát triển",
+  description:
+    "Không gian học tập, rèn luyện kỹ năng và cộng tác chuyên nghiệp",
+};
 
-const App = dynamic(() => import("@/features/portal/portal-app"), {
-  ssr: false,
-  loading: () => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        color: "#6b57bd",
-        fontWeight: 600,
-      }}
-    >
-      Đang tải MatureX...
-    </div>
-  ),
-});
-
-export default function Home() {
-  return <App />;
+export default function HomePage() {
+  return <PortalApp />;
 }

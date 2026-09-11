@@ -28,9 +28,6 @@ import {
   insertUser,
   prepareUser,
   publicUser,
-  startSession,
-  endSession,
-  verifyPassword,
   type AuthUser,
   type PublicUser,
   type UserRow,
@@ -229,61 +226,6 @@ export function createApp({
         });
         if (result?.handled) return;
         if (result) return send(result.status || 200, result.data);
-      }
-
-      const setupAvailable = () =>
-        allowSetup && !db.prepare("SELECT 1 FROM users LIMIT 1").get();
-
-      if (method === "GET" && path === "/api/session") {
-        let user: PublicUser | null = null;
-        try {
-          user = authenticate(db, req);
-        } catch (error: unknown) {
-          const err = error as { status?: number };
-          if (err.status !== 401) throw error;
-        }
-        return send(200, { user, setupRequired: Boolean(setupAvailable()) });
-      }
-
-      if (method === "POST" && path === "/api/setup") {
-        check(allowSetup, 403, "Thiết lập ban đầu chưa được bật trên máy chủ.");
-        check(setupAvailable(), 409, "Hệ thống đã được thiết lập.");
-        rateLimit(req);
-        const prepared = await prepareUser({ ...body, role: "admin" });
-        const user = transaction(db, () => {
-          check(setupAvailable(), 409, "Hệ thống đã được thiết lập.");
-          return insertUser(db, prepared);
-        });
-        startSession(db, req, res, user.id, secure);
-        return send(201, { user });
-      }
-
-      if (method === "POST" && path === "/api/login") {
-        rateLimit(req);
-        const email =
-          typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-        const user = db.prepare("SELECT * FROM users WHERE email=?").get(email) as unknown as UserRow | undefined;
-        check(
-          (await verifyPassword(body.password, user?.password_hash)) &&
-            user?.active === 1,
-          401,
-          "Email hoặc mật khẩu không đúng.",
-        );
-        const current = db
-          .prepare("SELECT * FROM users WHERE id=?")
-          .get((user as UserRow).id) as unknown as UserRow | undefined;
-        check(
-          current?.active === 1 && current.password_hash === (user as UserRow).password_hash,
-          401,
-          "Email hoặc mật khẩu không đúng.",
-        );
-        startSession(db, req, res, (current as UserRow).id, secure);
-        return send(200, { user: publicUser(current as UserRow) });
-      }
-
-      if (method === "POST" && path === "/api/logout") {
-        endSession(db, req, res, secure);
-        return send(200, { ok: true });
       }
 
       if (path.startsWith("/api/password/")) {

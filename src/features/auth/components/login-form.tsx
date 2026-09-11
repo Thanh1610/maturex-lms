@@ -1,5 +1,8 @@
+"use client";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import {
@@ -14,90 +17,48 @@ import {
   Icon,
   Input,
 } from "@/components/ui";
-import { api } from "@/lib/api-client";
+import { useAuthStore } from "../stores/auth-store";
 
-export function LoginForm({
-  setup,
-  onLogin,
-  resumeUser,
-}: {
-  setup: boolean;
-  onLogin: () => void;
-  resumeUser?: { id: string; email: string } | null;
-}) {
-  const [provider, setProvider] = useState<{
-    configured: boolean;
-    startUrl: string;
-    label: string;
-  } | null>(null);
+const formSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập email")
+    .email("Email không đúng định dạng")
+    .max(254, "Email quá dài"),
+  password: z
+    .string()
+    .min(8, "Mật khẩu tối thiểu 8 ký tự")
+    .max(128, "Mật khẩu tối đa 128 ký tự"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+export function LoginForm({ onLogin }: { onLogin?: () => void }) {
+  const router = useRouter();
   const [serverError, setServerError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api<{ oidc: { configured: boolean; startUrl: string; label: string } }>(
-      "/auth/providers",
-    )
-      .then((d) => setProvider(d.oidc))
-      .catch(() => {});
-  }, []);
-
-  const formSchema = z.object({
-    name: setup
-      ? z
-          .string()
-          .min(1, "Vui lòng nhập họ và tên")
-          .max(100, "Tối đa 100 ký tự")
-      : z.string().optional(),
-    email: z
-      .string()
-      .min(1, "Vui lòng nhập email")
-      .email("Email không đúng định dạng")
-      .max(254, "Email quá dài"),
-    password: setup
-      ? z
-          .string()
-          .min(12, "Mật khẩu tối thiểu 12 ký tự cho tài khoản khởi tạo")
-          .max(128, "Mật khẩu tối đa 128 ký tự")
-      : z
-          .string()
-          .min(1, "Vui lòng nhập mật khẩu")
-          .max(128, "Mật khẩu tối đa 128 ký tự"),
-  });
-
-  type FormValues = z.infer<typeof formSchema>;
+  const login = useAuthStore((s) => s.login);
+  const isLoading = useAuthStore((s) => s.isLoading);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      email: resumeUser?.email || "",
+      email: "",
       password: "",
     },
   });
 
   async function onSubmit(values: FormValues) {
-    if (busy) return;
-    setBusy(true);
+    if (isLoading) return;
     setServerError("");
     try {
-      const result = await api<{ user: { id: string } }>(
-        setup ? "/setup" : "/login",
-        "POST",
-        values,
-      );
-      if (resumeUser && result.user.id !== resumeUser.id) {
-        await api("/logout", "POST", {});
-        throw new Error(
-          "Hãy đăng nhập đúng tài khoản " +
-            resumeUser.email +
-            " để tiếp tục bản nháp.",
-        );
+      await login(values.email, values.password);
+      if (onLogin) {
+        onLogin();
+      } else {
+        router.replace("/");
       }
-      await onLogin();
     } catch (error: unknown) {
       setServerError(error instanceof Error ? error.message : "Có lỗi xảy ra");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -141,40 +102,15 @@ export function LoginForm({
               MATUREX LMS
             </span>
             <h2 className="text-2xl font-bold text-[#1f1b2d] tracking-tight">
-              {setup ? "Khởi tạo không gian học tập" : "Chào mừng bạn trở lại"}
+              Chào mừng bạn trở lại
             </h2>
             <p className="text-xs text-[#858894] leading-relaxed mt-1">
-              {resumeUser
-                ? "Phiên đã hết hạn. Đăng nhập lại đúng tài khoản để tiếp tục; bản nháp vẫn được giữ trong trang này."
-                : setup
-                  ? "Tạo tài khoản quản trị đầu tiên để bắt đầu tổ chức đào tạo."
-                  : "Đăng nhập bằng tài khoản được quản trị viên cấp."}
+              Đăng nhập bằng tài khoản được quản trị viên cấp.
             </p>
           </div>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {setup && (
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Họ và tên</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Nguyễn Văn A"
-                          autoComplete="name"
-                          disabled={busy}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
               <FormField
                 control={form.control}
                 name="email"
@@ -186,7 +122,7 @@ export function LoginForm({
                         type="email"
                         placeholder="ten@congty.com"
                         autoComplete="username"
-                        disabled={busy}
+                        disabled={isLoading}
                         {...field}
                       />
                     </FormControl>
@@ -205,18 +141,11 @@ export function LoginForm({
                       <Input
                         type="password"
                         placeholder="••••••••••••"
-                        autoComplete={
-                          setup ? "new-password" : "current-password"
-                        }
-                        disabled={busy}
+                        autoComplete="current-password"
+                        disabled={isLoading}
                         {...field}
                       />
                     </FormControl>
-                    {setup && (
-                      <p className="text-[11px] text-[#858894]">
-                        Dùng mật khẩu từ 12 đến 128 ký tự.
-                      </p>
-                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -232,16 +161,12 @@ export function LoginForm({
               )}
 
               <Button
-                disabled={busy}
+                disabled={isLoading}
                 type="submit"
                 icon="ArrowRight"
                 className="w-full mt-2"
               >
-                {busy
-                  ? "Đang xử lý…"
-                  : setup
-                    ? "Tạo không gian học tập"
-                    : "Đăng nhập"}
+                {isLoading ? "Đang xử lý…" : "Đăng nhập"}
               </Button>
 
               <a
@@ -250,25 +175,6 @@ export function LoginForm({
               >
                 Khám phá cổng học tập <Icon name="ArrowUpRight" size={14} />
               </a>
-
-              {!setup && !resumeUser && (
-                <div className="flex flex-col items-center gap-2 pt-2 border-t border-[#f1f2f5]">
-                  <a
-                    className="text-xs text-[#747080] hover:text-[#6b57bd] transition-colors"
-                    href="/auth/login#forgot"
-                  >
-                    Quên mật khẩu?
-                  </a>
-                  {provider?.configured && (
-                    <a
-                      className="w-full text-center py-2 px-4 rounded-md border border-[#e4e3eb] text-xs text-[#747080] hover:bg-[#fdfbff] transition-colors"
-                      href={provider.startUrl}
-                    >
-                      Đăng nhập với {provider.label}
-                    </a>
-                  )}
-                </div>
-              )}
             </form>
           </Form>
         </div>

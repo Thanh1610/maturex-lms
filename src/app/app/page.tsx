@@ -1,24 +1,10 @@
-"use client";
+import type { Metadata } from "next";
+import LiveApp from "@/features/app-shell/app-shell";
 
-import dynamic from "next/dynamic";
-
-const LiveApp = dynamic(() => import("@/features/app-shell/app-shell"), {
-  ssr: false,
-  loading: () => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        color: "#6b57bd",
-        fontWeight: 600,
-      }}
-    >
-      Đang tải MatureX LMS...
-    </div>
-  ),
-});
+export const metadata: Metadata = {
+  title: "Bảng điều khiển học tập | MatureX LMS",
+  description: "Không gian trải nghiệm học tập LMS MatureX",
+};
 
 export default function AppPage() {
   return <LiveApp />;

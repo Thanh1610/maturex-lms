@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui";
 import { api } from "@/lib/api-client";
+import { API_ROUTES } from "@/lib/api-routes";
 import { dateLabel } from "@/lib/formatters";
 import type { AppState, LiveUser } from "@/types";
 import { IntegrationStatus } from "../../admin/components/service-integrations";
@@ -279,7 +280,7 @@ export function Settings({
     setError("");
     const values = Object.fromEntries(new FormData(e.currentTarget));
     try {
-      await api("/account/password", "POST", values);
+      await api(API_ROUTES.account.password, "POST", values);
       location.assign("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
@@ -396,106 +397,5 @@ export function Settings({
         </div>
       )}
     </>
-  );
-}
-export function PasswordRecovery({
-  token,
-  onDone,
-}: {
-  token?: string;
-  onDone?: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const body = Object.fromEntries(new FormData(e.currentTarget));
-      const result = await api<{ message?: string }>(
-        token ? "/password/reset" : "/password/forgot",
-        "POST",
-        token ? { token, password: body.password } : body,
-      );
-      setMessage(
-        token
-          ? "Đã đặt lại mật khẩu. Bạn có thể đăng nhập."
-          : result.message || "",
-      );
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="live-loading min-h-screen flex items-center justify-center flex-col p-[30px]">
-      <form
-        className="live-panel live-form bg-white border border-[var(--border,#e9eaf0)] rounded-[12px] p-[25px] shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col gap-[18px] w-full max-w-[460px]"
-        onSubmit={submit}
-      >
-        <h1 className="text-[24px] font-bold text-[#1f1b2d] mb-1">
-          {token ? "Đặt lại mật khẩu" : "Quên mật khẩu"}
-        </h1>
-        {message ? (
-          <p className="text-[12px] text-[#3b7c53]" role="status">
-            {message}
-          </p>
-        ) : (
-          <>
-            {token ? (
-              <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-                Mật khẩu mới
-                <input
-                  className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
-                  type="password"
-                  name="password"
-                  required
-                  minLength={12}
-                  maxLength={128}
-                  autoComplete="new-password"
-                />
-              </label>
-            ) : (
-              <label className="flex flex-col gap-2 text-[11px] font-medium min-w-0">
-                Email tài khoản
-                <input
-                  className="w-full font-normal border border-[var(--border,#e9eaf0)] rounded-[8px] p-2 text-[12px]"
-                  type="email"
-                  name="email"
-                  required
-                  maxLength={254}
-                />
-              </label>
-            )}
-            {error && (
-              <p
-                className="live-error bg-[#fcf0ef] text-[#9c4545] p-[15px_18px] border border-[#efd3d0] rounded-[9px] leading-[1.8]"
-                role="alert"
-              >
-                {error}
-              </p>
-            )}
-            <div className="self-start">
-              <Button disabled={busy}>
-                {busy
-                  ? "Đang xử lý…"
-                  : token
-                    ? "Lưu mật khẩu mới"
-                    : "Gửi hướng dẫn"}
-              </Button>
-            </div>
-          </>
-        )}
-        <div className="self-start">
-          <Button type="button" kind="ghost" onClick={onDone}>
-            Về đăng nhập
-          </Button>
-        </div>
-      </form>
-    </div>
   );
 }
