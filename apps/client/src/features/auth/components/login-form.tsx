@@ -179,7 +179,6 @@ export function LoginForm({ onLogin }: { onLogin?: () => void }) {
                 )}
               />
 
-             
               <Button
                 disabled={isLoading}
                 type="submit"
@@ -188,13 +187,6 @@ export function LoginForm({ onLogin }: { onLogin?: () => void }) {
                 {isLoading ? "Đang xử lý…" : "Đăng nhập"}
                 <Icon name="ArrowRight" size={15} />
               </Button>
-
-              <a
-                className="text-center text-xs text-[#9b91ab] hover:text-[#6b57bd] flex items-center justify-center gap-1 pt-1 transition-colors no-underline"
-                href="/"
-              >
-                Khám phá cổng học tập <Icon name="ArrowUpRight" size={14} />
-              </a>
             </form>
           </Form>
         </div>
