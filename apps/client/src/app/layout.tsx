@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   description: "Hệ thống quản trị và đào tạo học tập trực tuyến MatureX",
 };
 
+import { AppLayout } from "@/components/layout/app-layout";
+import { Toaster } from "@maturex/ui";
+
 export default function RootLayout({
   children,
 }: {
@@ -21,7 +24,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" className={`${beVietnamPro.variable} h-full`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <AppLayout>{children}</AppLayout>
+        <Toaster richColors position="top-right" />
+      </body>
     </html>
   );
 }

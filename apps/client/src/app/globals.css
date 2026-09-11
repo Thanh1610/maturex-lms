@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../../../packages/ui";
 
 @theme inline {
   --font-sans: var(--font-be-vietnam-pro), sans-serif;
