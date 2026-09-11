@@ -1,12 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import {
-  Badge,
   Button,
   Form,
   FormControl,
@@ -77,34 +77,16 @@ export function LoginForm({ onLogin }: { onLogin?: () => void }) {
 
   return (
     <div className="min-h-screen w-full grid grid-cols-1 md:grid-cols-2 bg-white">
-      {/* Left side: Welcome Branding */}
-      <div className="bg-[#f0ecf6] flex flex-col items-start justify-center p-8 sm:p-12 md:p-16 lg:px-20">
-        <a
-          className="text-[#343340] text-3xl font-extrabold tracking-tight no-underline mb-8 md:mb-16 inline-flex items-center gap-1 cursor-pointer"
-          href="/"
-        >
-          maturex<span className="text-[#8b76cf]">×</span>
-        </a>
-        <div className="hidden md:block">
-          <Badge>LEARNING SPACE</Badge>
-        </div>
-        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-[#514660] mt-4 md:mt-6 leading-tight">
-          Học hỏi mỗi ngày.
-          <br />
-          Trưởng thành cùng nhau.
-        </h1>
-        <p className="text-[#8a7f98] max-w-sm mt-3 leading-relaxed hidden md:block">
-          Một không gian để học, thực hành và nhìn thấy sự tiến bộ của chính
-          mình.
-        </p>
-        <div className="mt-12 md:mt-16 flex items-center gap-4 text-[#8b7b9b] text-xs leading-relaxed hidden md:flex">
-          <Icon name="Sprout" size={32} />
-          <span>
-            Từ kiến thức đến hành động.
-            <br />
-            Từ trải nghiệm đến năng lực.
-          </span>
-        </div>
+      {/* Left side: Welcome Banner Image */}
+      <div className="relative hidden md:block w-full h-full min-h-screen bg-[#f0ecf6]">
+        <Image
+          src="/images/auth-banner.webp"
+          alt="MatureX - Không gian học tập"
+          fill
+          priority
+          sizes="(max-width: 768px) 100vw, 50vw"
+          className="object-cover"
+        />
       </div>
 
       {/* Right side: Login Form */}

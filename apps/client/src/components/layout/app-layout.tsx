@@ -10,7 +10,6 @@ import {
   Icon,
 } from "@maturex/ui";
 import { AppSidebar } from "./app-sidebar";
-import { UserNav } from "./user-nav";
 
 const routeTitles: Record<string, string> = {
   "/": "Tổng quan",
@@ -73,12 +72,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <Icon name="Bell" size={17} />
               <span className="w-2 h-2 bg-[#b290cb] rounded-full absolute top-1.5 right-1.5 border border-white" />
             </button>
-
-            {/* Separator */}
-            <span className="h-5 w-px bg-[var(--border,#e9eaf0)]" />
-
-            {/* User Avatar Dropdown with Logout */}
-            <UserNav />
           </div>
         </header>
 

@@ -5,8 +5,16 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/demo.html",
-        destination: "/demo",
+        destination: "/",
         permanent: true,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/demo",
+        destination: "/",
       },
     ];
   },

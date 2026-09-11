@@ -175,10 +175,6 @@ export default function App() {
   const go = useCallback((path: string) => {
     const cleanPath = path.replace(/^#/, "");
     if (typeof window !== "undefined") {
-      if (!window.location.pathname.startsWith("/demo")) {
-        window.location.href = `/demo#${cleanPath}`;
-        return;
-      }
       window.location.hash = cleanPath;
     }
     setRoute(cleanPath);

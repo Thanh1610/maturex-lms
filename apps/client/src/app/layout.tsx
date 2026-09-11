@@ -12,6 +12,11 @@ const beVietnamPro = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   title: "MatureX · Không gian học tập",
   description: "Hệ thống quản trị và đào tạo học tập trực tuyến MatureX",
+  icons: {
+    icon: "/logo_mobile.webp",
+    shortcut: "/logo_mobile.webp",
+    apple: "/logo_mobile.webp",
+  },
 };
 
 import { AppLayout } from "@/components/layout/app-layout";
