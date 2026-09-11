@@ -1,10 +1,16 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
-const App = dynamic(() => import("@/features/demo-preview/demo-app"), {
-  ssr: false,
-  loading: () => (
+export default function DemoPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/");
+  }, [router]);
+
+  return (
     <div
       style={{
         display: "flex",
@@ -15,11 +21,7 @@ const App = dynamic(() => import("@/features/demo-preview/demo-app"), {
         fontWeight: 600,
       }}
     >
-      Đang tải bản demo MatureX...
+      Đang chuyển hướng về trang chủ...
     </div>
-  ),
-});
-
-export default function DemoPage() {
-  return <App />;
+  );
 }

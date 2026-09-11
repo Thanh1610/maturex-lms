@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -145,6 +146,7 @@ export interface LiveAppState extends AppState {
 }
 
 export default function LiveApp() {
+  const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [state, setState] = useState<LiveAppState | null>(null);
   const [route, setRoute] = useState(
@@ -238,7 +240,7 @@ export default function LiveApp() {
       setSession({ user: null, setupRequired: false });
       setError("");
       setNotice("");
-      go("home");
+      router.push("/auth/login");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
@@ -298,8 +300,16 @@ export default function LiveApp() {
         )}
       </div>
     );
-  if (!session.user)
-    return <LoginForm setup={session.setupRequired} onLogin={boot} />;
+  if (!session.user) {
+    if (typeof window !== "undefined") {
+      router.push("/auth/login");
+    }
+    return (
+      <div className="live-loading">
+        <p role="status">Đang chuyển đến trang đăng nhập…</p>
+      </div>
+    );
+  }
   if (!state)
     return (
       <div className="live-loading">

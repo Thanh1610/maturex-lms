@@ -67,38 +67,38 @@ export function CourseCard({
       </button>
       <div className="course-info p-[18px_19px_13px] max-sm:p-4 max-[440px]:p-5 flex flex-col flex-1">
         <div className="between flex items-center justify-between gap-[14px]">
-          <span className="category text-[10px] text-[#a28db4] tracking-[0.15px] font-medium">
+          <span className="category text-xs text-[#7a6096] tracking-[0.15px] font-semibold">
             {course.category}
           </span>
-          <span className="muted tiny text-[#858894] text-[10px]">
+          <span className="text-xs text-[#6e6878] font-medium">
             {course.level}
           </span>
         </div>
         <button
-          className="title-link block text-left text-[14px] max-sm:text-[13px] max-[440px]:text-[16px] font-[550] leading-[1.7] my-[9px] mb-3 p-0 min-h-[48px] max-sm:min-h-[44px] max-[440px]:min-h-0 tracking-[-0.25px] text-[#56515f] hover:text-[#8c6eb2] cursor-pointer"
+          className="title-link block text-left text-[14px] max-sm:text-[13px] max-[440px]:text-[16px] font-[550] leading-[1.7] my-[9px] mb-3 p-0 min-h-[48px] max-sm:min-h-[44px] max-[440px]:min-h-0 tracking-[-0.25px] text-[#2d2838] hover:text-[#6b57bd] cursor-pointer"
           onClick={() => go(`course/${course.id}`)}
         >
           {course.title}
         </button>
-        <div className="course-meta flex flex-wrap gap-3 max-sm:gap-2 text-[10px] text-[#a9a1b0] items-center">
+        <div className="course-meta flex flex-wrap gap-3 max-sm:gap-2 text-xs text-[#6e6878] items-center font-normal">
           <span className="flex items-center gap-1.25">
-            <Icon name="Video" size={14} />
+            <Icon name="Video" size={14} className="text-[#8b8296]" />
             {course.lessons.length} bài học
           </span>
           <span className="flex items-center gap-1.25">
-            <Icon name="Clock" size={14} />
+            <Icon name="Clock" size={14} className="text-[#8b8296]" />
             {course.duration}
           </span>
         </div>
         {done !== undefined ? (
           <>
             <Progress value={done} />
-            <div className="between tiny flex items-center justify-between gap-[14px] text-[10px] mt-auto">
-              <span className="muted text-[#858894]">
+            <div className="between flex items-center justify-between gap-[14px] text-xs mt-auto pt-1">
+              <span className="text-[#595364] font-medium">
                 {done === 100 ? "Đã hoàn thành" : `${done}% hoàn thành`}
               </span>
               <button
-                className="text-btn inline-flex items-center gap-[7px] text-[10px] font-medium text-[#8a75af] py-[3px] px-0 whitespace-nowrap cursor-pointer hover:text-[#5f498b]"
+                className="text-btn inline-flex items-center gap-[7px] text-xs font-semibold text-[#6b57bd] py-[3px] px-0 whitespace-nowrap cursor-pointer hover:text-[#4b3c88]"
                 onClick={() => go(`course/${course.id}`)}
               >
                 {done === 100 ? "Xem lại" : "Tiếp tục học"}
@@ -107,13 +107,13 @@ export function CourseCard({
             </div>
           </>
         ) : (
-          <div className="course-footer flex items-center gap-[7px] text-[10px] text-[#a197a8] border-t border-[#f0edf5] mt-[17px] pt-[13px]">
-            <span className="teacher-dot w-[21px] h-[21px] rounded-full bg-[#ede8f3] text-[#ad9abe] flex items-center justify-center text-[10px]">
+          <div className="course-footer flex items-center gap-[7px] text-xs text-[#6e6878] border-t border-[#f0edf5] mt-[17px] pt-[13px]">
+            <span className="teacher-dot w-[22px] h-[22px] rounded-full bg-[#eee8f8] text-[#6b57bd] font-semibold flex items-center justify-center text-[11px]">
               {course.teacher.slice(0, 1)}
             </span>
-            <span>{course.teacher}</span>
-            <span className="students ml-auto flex gap-[5px] items-center">
-              <Icon name="Users" size={14} />
+            <span className="font-medium text-[#463f52]">{course.teacher}</span>
+            <span className="students ml-auto flex gap-[5px] items-center text-[#6e6878]">
+              <Icon name="Users" size={14} className="text-[#8b8296]" />
               {course.students}
             </span>
           </div>

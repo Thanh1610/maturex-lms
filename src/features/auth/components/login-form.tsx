@@ -246,16 +246,16 @@ export function LoginForm({
 
               <a
                 className="text-center text-xs text-[#9b91ab] hover:text-[#6b57bd] flex items-center justify-center gap-1 pt-1 transition-colors"
-                href="/demo"
+                href="/"
               >
-                Xem bản demo giao diện <Icon name="ArrowUpRight" size={14} />
+                Khám phá cổng học tập <Icon name="ArrowUpRight" size={14} />
               </a>
 
               {!setup && !resumeUser && (
                 <div className="flex flex-col items-center gap-2 pt-2 border-t border-[#f1f2f5]">
                   <a
                     className="text-xs text-[#747080] hover:text-[#6b57bd] transition-colors"
-                    href="#forgot"
+                    href="/auth/login#forgot"
                   >
                     Quên mật khẩu?
                   </a>

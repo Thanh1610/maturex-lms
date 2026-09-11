@@ -8,7 +8,7 @@ import {
   Modal,
   useApp,
 } from "@/components/ui";
-import { initialState, normalize, paths, people } from "./demo-data";
+import { initialState, normalize, paths, people } from "./portal-data";
 import {
   Assignments,
   Assistant,
@@ -17,7 +17,7 @@ import {
   Course,
   Dashboard,
   Paths,
-} from "./demo-learning";
+} from "./portal-learning";
 import {
   Community,
   Reports,
@@ -26,8 +26,8 @@ import {
   Skills,
   Studio,
   Team,
-} from "./demo-management";
-import { STORAGE_KEY, transition } from "./demo-store";
+} from "./portal-management";
+import { STORAGE_KEY, transition } from "./portal-store";
 
 const baseNav = [
   ["home", "Home", "Tổng quan"],
@@ -132,113 +132,10 @@ function DemoGuide() {
     </div>
   );
 }
-function GlobalSearch() {
-  const { state, go, close, role } = useApp();
-  const [q, setQ] = useState("");
-  const n = normalize(q);
-  const results = [
-    ...state.courses
-      .filter((c) => c.status === "published")
-      .map((c) => ({
-        name: c.title,
-        sub: c.category,
-        route: `course/${c.id}`,
-        icon: c.icon,
-      })),
-    ...[...paths, ...(state.customPaths || [])].map((p) => ({
-      name: p.title,
-      sub: "Lộ trình học",
-      route: "paths",
-      icon: "Compass",
-    })),
-    ...(role === "manager"
-      ? people.map((p) => ({
-          name: p.name,
-          sub: `${p.job} · ${p.team}`,
-          route: "team",
-          icon: "Users",
-        }))
-      : []),
-  ].filter((x) => normalize(`${x.name} ${x.sub}`).includes(n));
-  return (
-    <>
-      <div className="search-input large">
-        <Icon name="Search" />
-        <input
-          autoFocus
-          placeholder="Tìm khóa học, năng lực, chủ đề…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
-      <p className="muted tiny">
-        {q ? `${results.length} kết quả` : "Khám phá nhanh"}
-      </p>
-      <div className="search-results">
-        {results.length ? (
-          results.map((r) => (
-            <button
-              key={r.route + r.name}
-              onClick={() => {
-                go(r.route);
-                close();
-              }}
-            >
-              <span className="icon-tile lavender">
-                <Icon name={r.icon} />
-              </span>
-              <div>
-                <strong>{r.name}</strong>
-                <small>{r.sub}</small>
-              </div>
-              <Icon name="ArrowUpRight" size={18} />
-            </button>
-          ))
-        ) : (
-          <Empty
-            title="Chưa tìm thấy kết quả"
-            description="Thử từ khóa khác như AI, văn hoá hoặc nghiên cứu."
-          />
-        )}
-      </div>
-    </>
-  );
-}
-function NotificationList() {
-  const { state, dispatch, go, close } = useApp();
-  return (
-    <>
-      <div className="between">
-        <span className="muted small">Thông báo trong demo</span>
-        <button
-          className="text-btn"
-          onClick={() => dispatch({ type: "readNotifications" })}
-        >
-          Đánh dấu đã đọc
-        </button>
-      </div>
-      <div className="notification-list">
-        {state.notifications.map((n) => (
-          <button
-            key={n.id}
-            onClick={() => {
-              dispatch({ type: "readNotifications" });
-              go(n.route);
-              close();
-            }}
-          >
-            <span className={`notice-dot ${n.read ? "read" : ""}`} />
-            <div>
-              <strong>{n.text}</strong>
-              <small>{n.read ? "Đã đọc" : "Mới"} · Dữ liệu demo</small>
-            </div>
-            <Icon name="ChevronRight" size={17} />
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
+
+import { GlobalSearch } from "./components/shared/global-search";
+import { NotificationList } from "./components/shared/notification-list";
+
 export default function App() {
   const [state, dispatch] = useReducer(transition, undefined, load);
   const [route, setRoute] = useState(() => location.hash.slice(1) || "home");
@@ -572,45 +469,15 @@ export default function App() {
                 )}
               </button>
               <span className="top-divider h-[22px] w-px bg-[var(--border,#e9eaf0)] max-md:hidden" />
-              <Avatar person={people[0]} size="small" />
+              <a
+                href="/auth/login"
+                className="inline-flex items-center gap-1.5 bg-[#6b57bd] text-white text-[11px] px-3.5 py-1.5 rounded-lg font-medium hover:bg-[#5946aa] transition-colors no-underline shadow-sm cursor-pointer"
+              >
+                <span>Đăng nhập</span>
+                <Icon name="ArrowRight" size={13} />
+              </a>
             </div>
           </header>
-          <div className="demo-bar min-h-[35px] bg-[#f0edf7] border-b border-[#e5deef] px-[35px] max-lg:px-[25px] max-md:px-[18px] py-1.5 flex items-center justify-between gap-3 text-[10px] text-[#897096]">
-            <span className="flex items-center gap-1.5 font-[550] tracking-[0.4px]">
-              <i className="w-[5px] h-[5px] bg-[#9b89ba] rounded-full not-italic" />{" "}
-              BẢN DEMO{" "}
-              <span className="demo-explainer font-normal tracking-normal text-[#9b88a5] max-lg:hidden">
-                · Dữ liệu mẫu, thay đổi được lưu trên trình duyệt
-              </span>
-            </span>
-            <div className="flex items-center gap-2 max-md:gap-1.5">
-              <label
-                htmlFor="role-selector"
-                className="text-[10px] max-md:text-[9px] text-[#897096]"
-              >
-                Trải nghiệm vai
-              </label>
-              <select
-                id="role-selector"
-                value={role}
-                onChange={(e) => selectRole(e.target.value)}
-                className="bg-white/60 text-[10px] py-[3px] pr-5 pl-1.5 border border-[#e4ddee] rounded text-[#77648f] cursor-pointer"
-              >
-                {Object.entries(roles).map(([id, label]) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => open("Khám phá MX LMS", <DemoGuide />)}
-                aria-label="Hướng dẫn trải nghiệm"
-                className="p-0 text-[#9a89b1] cursor-pointer"
-              >
-                <Icon name="HelpCircle" size={17} />
-              </button>
-            </div>
-          </div>
           {persistError && (
             <div className="callout peach m-4">
               Trình duyệt không lưu được dữ liệu. Thay đổi hiện chỉ giữ trong
@@ -625,12 +492,9 @@ export default function App() {
           </main>
           <footer className="app-footer px-[35px] py-3 pb-5 max-md:px-[18px] text-[10px] text-[#817489] flex justify-between gap-3">
             <span>MatureX Learning · Phát triển từ bên trong</span>
-            <button
-              onClick={() => open("Khám phá MX LMS", <DemoGuide />)}
-              className="text-[#9e91af] text-[10px] flex gap-1.5 items-center cursor-pointer"
-            >
-              Hướng dẫn trải nghiệm <Icon name="ArrowUpRight" size={13} />
-            </button>
+            <span className="text-[#9e91af] text-[10px]">
+              Cổng thông tin & Thư viện học tập
+            </span>
           </footer>
         </div>
         {modal && (

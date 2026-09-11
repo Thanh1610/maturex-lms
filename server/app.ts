@@ -115,7 +115,7 @@ export function createApp({
   const integrations = createIntegrations({
     db,
     env,
-    origin: configuredOrigin || "http://127.0.0.1:3000",
+    origin: configuredOrigin || "http://localhost:3000",
   });
 
   const attempts = new Map<string, { count: number; until: number }>();
@@ -498,7 +498,7 @@ export function createApp({
           runJobs(
             db,
             integrations,
-            configuredOrigin || `http://127.0.0.1:${p}`,
+            configuredOrigin || `http://localhost:${p}`,
           );
         } catch (e: unknown) {
           const err = e as { message?: string };

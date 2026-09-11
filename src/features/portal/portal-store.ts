@@ -1,11 +1,49 @@
-import type { AppState } from "@/types/index";
-import { initialState } from "./demo-data";
-export const STORAGE_KEY = "maturex-lms-demo-v1";
-function enrollCourse(s: any, id: string, person = "me", due = "25/09/2026") {
-  const c = s.courses.find((c: any) => c.id === id);
+import { initialState } from "./portal-data";
+export const STORAGE_KEY = "maturex-lms-portal-v1";
+
+type BaseState = ReturnType<typeof initialState>;
+type ArrayElement<ArrayType extends readonly unknown[]> =
+  ArrayType extends readonly (infer ElementType)[] ? ElementType : never;
+
+export type PortalCourse = ArrayElement<BaseState["courses"]> & {
+  exercise?: string;
+  [key: string]: unknown;
+};
+
+export type PortalAssignment = ArrayElement<BaseState["assignments"]> & {
+  history?: Array<Record<string, unknown>>;
+  file?: string;
+  submittedAt?: string;
+  reviewer?: string;
+  reviewedAt?: string;
+  [key: string]: unknown;
+};
+
+export type PortalState = Omit<BaseState, "courses" | "assignments"> & {
+  courses: PortalCourse[];
+  assignments: PortalAssignment[];
+  members?: Array<Record<string, unknown>>;
+  customPaths?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+};
+
+export interface PortalAction {
+  type: string;
+  id?: string;
+  // biome-ignore lint/suspicious/noExplicitAny: action payload varies per action type across the portal
+  value?: any;
+}
+
+function enrollCourse(
+  s: PortalState,
+  id: string,
+  person = "me",
+  due = "25/09/2026",
+) {
+  const c = s.courses.find((c) => c.id === id);
   if (!c) return;
   if (person === "me" && !s.enrolled.includes(id)) s.enrolled.push(id);
-  if (!s.assignments.some((a: any) => a.course === id && a.person === person)) {
+  if (!s.assignments.some((a) => a.course === id && a.person === person)) {
     s.assignments.push({
       id: `task-${person}-${id}`,
       course: id,
@@ -21,13 +59,18 @@ function enrollCourse(s: any, id: string, person = "me", due = "25/09/2026") {
     });
   }
 }
-export function progress(state: any, id: string): number {
-  const c = state.courses.find((c: any) => c.id === id);
+
+export function progress(state: PortalState, id: string): number {
+  const c = state.courses.find((c) => c.id === id);
   return c
     ? Math.round(((state.completed[id]?.length || 0) / c.lessons.length) * 100)
     : 0;
 }
-export function transition(state: any, action: any): any {
+
+export function transition(
+  state: PortalState,
+  action: PortalAction,
+): PortalState {
   const s = structuredClone(state);
   const { type, id, value } = action;
   switch (type) {

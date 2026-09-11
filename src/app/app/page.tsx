@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 
-const App = dynamic(() => import("@/features/portal/portal-app"), {
+const LiveApp = dynamic(() => import("@/features/app-shell/app-shell"), {
   ssr: false,
   loading: () => (
     <div
@@ -15,11 +15,11 @@ const App = dynamic(() => import("@/features/portal/portal-app"), {
         fontWeight: 600,
       }}
     >
-      Đang tải MatureX...
+      Đang tải MatureX LMS...
     </div>
   ),
 });
 
-export default function Home() {
-  return <App />;
+export default function AppPage() {
+  return <LiveApp />;
 }
