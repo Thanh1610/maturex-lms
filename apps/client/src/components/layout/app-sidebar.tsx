@@ -25,20 +25,21 @@ import {
   useSidebar,
 } from "@maturex/ui";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { APP_ROUTES } from "@/lib/api-routes";
 
 const baseNav = [
-  { href: "/", id: "home", icon: "Home", label: "Tổng quan" },
-  { href: "/catalog", id: "catalog", icon: "BookOpen", label: "Thư viện học tập" },
-  { href: "/assignments", id: "assignments", icon: "ClipboardCheck", label: "Bài tập & phản hồi", count: 2 },
-  { href: "/calendar", id: "calendar", icon: "CalendarDays", label: "Lịch đào tạo" },
-  { href: "/community", id: "community", icon: "MessageCircle", label: "Cộng đồng học tập" },
+  { href: APP_ROUTES.home, id: "home", icon: "Home", label: "Tổng quan" },
+  { href: APP_ROUTES.courses, id: "courses", icon: "BookOpen", label: "Khóa học" },
+  { href: APP_ROUTES.assignments, id: "assignments", icon: "ClipboardCheck", label: "Bài tập & phản hồi", count: 2 },
+  { href: APP_ROUTES.calendar, id: "calendar", icon: "CalendarDays", label: "Lịch đào tạo" },
+  { href: APP_ROUTES.community, id: "community", icon: "MessageCircle", label: "Cộng đồng học tập" },
 ];
 
 const managerNav = [
-  { href: "/team", id: "team", icon: "Users", label: "Đội ngũ" },
-  { href: "/reviews", id: "reviews", icon: "CheckSquare", label: "Đánh giá bài tập" },
-  { href: "/studio", id: "studio", icon: "FolderOpen", label: "Quản lý đào tạo" },
-  { href: "/reports", id: "reports", icon: "ChartNoAxesCombined", label: "Báo cáo & hiệu quả" },
+  { href: APP_ROUTES.team, id: "team", icon: "Users", label: "Đội ngũ" },
+  { href: APP_ROUTES.reviews, id: "reviews", icon: "CheckSquare", label: "Đánh giá bài tập" },
+  { href: APP_ROUTES.studio, id: "studio", icon: "FolderOpen", label: "Quản lý đào tạo" },
+  { href: APP_ROUTES.reports, id: "reports", icon: "ChartNoAxesCombined", label: "Báo cáo & hiệu quả" },
 ];
 
 export interface AppSidebarProps {
@@ -74,15 +75,15 @@ export function AppSidebar({ user: userProp }: AppSidebarProps) {
   const handleLogout = async () => {
     try {
       await logout();
-      router.replace("/auth/login");
+      router.replace(APP_ROUTES.auth.login);
       router.refresh();
     } catch {
-      router.replace("/auth/login");
+      router.replace(APP_ROUTES.auth.login);
     }
   };
 
   const isCurrent = (href: string) => {
-    if (href === "/") return pathname === "/";
+    if (href === APP_ROUTES.home) return pathname === APP_ROUTES.home;
     return pathname.startsWith(href);
   };
 
@@ -91,7 +92,7 @@ export function AppSidebar({ user: userProp }: AppSidebarProps) {
       {/* Brand Header */}
       <SidebarHeader>
         <Link
-          href="/"
+          href={APP_ROUTES.home}
           className={`brand flex items-center justify-center ${isCollapsed ? "p-0" : "w-full pb-4 pt-1"} cursor-pointer no-underline text-inherit`}
           title="MatureX Learning Space"
         >
@@ -302,19 +303,19 @@ export function AppSidebar({ user: userProp }: AppSidebarProps) {
 
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link href="/skills" className="flex items-center gap-2 w-full no-underline text-inherit cursor-pointer">
+                <Link href={APP_ROUTES.skills} className="flex items-center gap-2 w-full no-underline text-inherit cursor-pointer">
                   <Icon name="Target" size={14} className="text-[#81838e]" />
                   <span>Hồ sơ năng lực</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/paths" className="flex items-center gap-2 w-full no-underline text-inherit cursor-pointer">
+                <Link href={APP_ROUTES.paths} className="flex items-center gap-2 w-full no-underline text-inherit cursor-pointer">
                   <Icon name="Compass" size={14} className="text-[#81838e]" />
                   <span>Lộ trình của tôi</span>
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/settings" className="flex items-center gap-2 w-full no-underline text-inherit cursor-pointer">
+                <Link href={APP_ROUTES.settings} className="flex items-center gap-2 w-full no-underline text-inherit cursor-pointer">
                   <Icon name="Settings" size={14} className="text-[#81838e]" />
                   <span>Cài đặt tài khoản</span>
                 </Link>

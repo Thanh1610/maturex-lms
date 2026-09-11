@@ -10,21 +10,22 @@ import {
   Icon,
 } from "@maturex/ui";
 import { AppSidebar } from "./app-sidebar";
+import { APP_ROUTES } from "@/lib/api-routes";
 
 const routeTitles: Record<string, string> = {
-  "/": "Tổng quan",
-  "/catalog": "Thư viện học tập",
-  "/paths": "Lộ trình của tôi",
-  "/assignments": "Bài tập & phản hồi",
-  "/skills": "Hồ sơ năng lực",
-  "/calendar": "Lịch đào tạo",
-  "/community": "Cộng đồng học tập",
-  "/assistant": "Trợ lý học tập AI",
-  "/team": "Đội ngũ",
-  "/reviews": "Đánh giá bài tập",
-  "/studio": "Quản lý đào tạo",
-  "/reports": "Báo cáo & hiệu quả",
-  "/settings": "Cài đặt",
+  [APP_ROUTES.home]: "Tổng quan",
+  [APP_ROUTES.courses]: "Khóa học",
+  [APP_ROUTES.paths]: "Lộ trình của tôi",
+  [APP_ROUTES.assignments]: "Bài tập & phản hồi",
+  [APP_ROUTES.skills]: "Hồ sơ năng lực",
+  [APP_ROUTES.calendar]: "Lịch đào tạo",
+  [APP_ROUTES.community]: "Cộng đồng học tập",
+  [APP_ROUTES.assistant]: "Trợ lý học tập AI",
+  [APP_ROUTES.team]: "Đội ngũ",
+  [APP_ROUTES.reviews]: "Đánh giá bài tập",
+  [APP_ROUTES.studio]: "Quản lý đào tạo",
+  [APP_ROUTES.reports]: "Báo cáo & hiệu quả",
+  [APP_ROUTES.settings]: "Cài đặt",
 };
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

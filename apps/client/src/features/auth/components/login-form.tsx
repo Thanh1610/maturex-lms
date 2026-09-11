@@ -19,6 +19,7 @@ import {
   toast,
 } from "@maturex/ui";
 import { useAuthStore } from "../stores/auth-store";
+import { APP_ROUTES } from "@/lib/api-routes";
 
 const formSchema = z.object({
   email: z
@@ -37,7 +38,7 @@ type FormValues = z.infer<typeof formSchema>;
 export function LoginForm({ onLogin }: { onLogin?: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || APP_ROUTES.home;
   const [showPassword, setShowPassword] = useState(false);
   const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
