@@ -3,6 +3,14 @@
     "shadcn": {
       "command": "npx",
       "args": ["shadcn@latest", "mcp"]
+    },
+    "prisma": {
+      "command": "npx",
+      "args": ["-y", "prisma", "mcp"]
+    },
+    "prisma-remote": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.prisma.io/mcp"]
     }
   }
 }
