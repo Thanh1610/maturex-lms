@@ -22,7 +22,9 @@ export function CourseDetailView({ course }: CourseDetailViewProps) {
 
   // Đọc nội dung slide từ DB lesson nếu có, fallback về topicDetails hoặc mặc định
   const detailCourse = "lessonsList" in course ? (course as ClientCourseDetail) : null;
-  const currentLessonContent = detailCourse?.lessonsList?.[currentLesson]?.content;
+  const currentLessonData = detailCourse?.lessonsList?.[currentLesson];
+  const currentLessonContent = currentLessonData?.content;
+  const currentLessonVideo = currentLessonData?.videoUrl;
 
   const slides = currentLessonContent
     ? currentLessonContent
@@ -72,6 +74,7 @@ export function CourseDetailView({ course }: CourseDetailViewProps) {
             course={course}
             currentLessonIndex={currentLesson}
             slides={slides}
+            videoUrl={currentLessonVideo}
           />
 
           {/* Lesson Actions Banner */}

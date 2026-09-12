@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Button,
   Empty,
@@ -17,18 +18,21 @@ import {
 } from "@maturex/ui";
 import { CourseCard } from "./course-card";
 import type { ClientCourseListItem } from "../services/course-service";
+import { findFromSlug, slugify } from "@/lib/slug-helper";
 
 interface CourseInteractiveSectionProps {
   initialCourses?: ClientCourseListItem[];
 }
 
+const LEVEL_OPTIONS = ["Tất cả cấp độ", "Nền tảng", "Ứng dụng", "Nâng cao"] as const;
+
 export function CourseInteractiveSection({
   initialCourses = [],
 }: CourseInteractiveSectionProps) {
-  const [activeCategory, setActiveCategory] = useState<string>("Tất cả");
-  const [levelFilter, setLevelFilter] = useState<string>("Tất cả cấp độ");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
 
   // Danh mục tabs trích xuất động theo dữ liệu thực tế
   const dynamicCategories = useMemo(() => {
@@ -38,6 +42,102 @@ export function CourseInteractiveSection({
     });
     return ["Tất cả", ...Array.from(set)];
   }, [initialCourses]);
+
+  // Read initial states from URL query params (hỗ trợ cả slug đẹp lẫn chuỗi thô để tương thích ngược)
+  const categoryParam = searchParams.get("category");
+  const categoryFromUrl = useMemo(
+    () => findFromSlug(categoryParam, dynamicCategories, "Tất cả"),
+    [categoryParam, dynamicCategories]
+  );
+
+  const levelParam = searchParams.get("level");
+  const levelFromUrl = useMemo(
+    () => findFromSlug(levelParam, LEVEL_OPTIONS, "Tất cả cấp độ"),
+    [levelParam]
+  );
+
+  const searchFromUrl = searchParams.get("q") || "";
+
+  const [activeCategory, setActiveCategory] = useState<string>(categoryFromUrl);
+  const [levelFilter, setLevelFilter] = useState<string>(levelFromUrl);
+  const [searchQuery, setSearchQuery] = useState<string>(searchFromUrl);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+
+  // Sync state if URL changes externally (e.g. browser back/forward)
+  useEffect(() => {
+    setActiveCategory(categoryFromUrl);
+  }, [categoryFromUrl]);
+
+  useEffect(() => {
+    setLevelFilter(levelFromUrl);
+  }, [levelFromUrl]);
+
+  useEffect(() => {
+    setSearchQuery(searchFromUrl);
+  }, [searchFromUrl]);
+
+  // Helper to push updated query parameters to URL with clean slugs
+  const updateUrlParams = useCallback(
+    (updates: { category?: string; level?: string; q?: string }) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (updates.category !== undefined) {
+        if (updates.category === "Tất cả" || !updates.category) {
+          params.delete("category");
+        } else {
+          params.set("category", slugify(updates.category));
+        }
+      }
+
+      if (updates.level !== undefined) {
+        if (updates.level === "Tất cả cấp độ" || !updates.level) {
+          params.delete("level");
+        } else {
+          params.set("level", slugify(updates.level));
+        }
+      }
+
+      if (updates.q !== undefined) {
+        const trimmed = updates.q.trim();
+        if (!trimmed) {
+          params.delete("q");
+        } else {
+          params.set("q", trimmed);
+        }
+      }
+
+      const queryString = params.toString();
+      const targetUrl = queryString ? `${pathname}?${queryString}` : pathname;
+
+      startTransition(() => {
+        router.replace(targetUrl, { scroll: false });
+      });
+    },
+    [searchParams, pathname, router]
+  );
+
+  // Handle category change
+  const handleCategoryChange = (category: string) => {
+    setActiveCategory(category);
+    updateUrlParams({ category });
+  };
+
+  // Handle level change
+  const handleLevelChange = (level: string) => {
+    setLevelFilter(level);
+    updateUrlParams({ level });
+  };
+
+  // Debounce search query to URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== searchFromUrl) {
+        updateUrlParams({ q: searchQuery });
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchFromUrl, updateUrlParams]);
 
   // Bộ lọc dữ liệu theo Danh mục, Cấp độ và Từ khóa tìm kiếm
   const filteredCourses = useMemo(() => {
@@ -63,17 +163,12 @@ export function CourseInteractiveSection({
     );
   };
 
-  const handleExploreAI = () => {
-    setActiveCategory("AI & Dữ liệu");
-    setSearchQuery("");
-  };
-
   return (
     <>
       {/* Dynamic Category Tabs using Shadcn UI / Radix Tabs */}
       <Tabs
         value={activeCategory}
-        onValueChange={setActiveCategory}
+        onValueChange={handleCategoryChange}
         className="w-full"
       >
         <TabsList className="mb-5 flex-wrap h-auto">
@@ -112,7 +207,7 @@ export function CourseInteractiveSection({
           />
         </div>
 
-        <Select value={levelFilter} onValueChange={setLevelFilter}>
+        <Select value={levelFilter} onValueChange={handleLevelChange}>
           <SelectTrigger
             className="h-11 min-w-[160px] max-[900px]:min-w-0 max-[900px]:max-w-[145px] bg-white border-[var(--border,#e9eaf0)] text-xs text-[#6c5980] rounded-lg px-3"
             aria-label="Cấp độ khóa học"
@@ -159,6 +254,7 @@ export function CourseInteractiveSection({
               setActiveCategory("Tất cả");
               setLevelFilter("Tất cả cấp độ");
               setSearchQuery("");
+              updateUrlParams({ category: "Tất cả", level: "Tất cả cấp độ", q: "" });
             }}
           >
             Đặt lại bộ lọc

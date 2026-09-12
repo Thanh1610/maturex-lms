@@ -2,26 +2,57 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Icon, toast } from "@maturex/ui";
+import { parseVideoUrl } from "@/lib/video-url-helper";
 import type { Course } from "../mock-courses";
 
 interface CoursePlayerProps {
   course: Course;
   currentLessonIndex: number;
   slides: string[];
+  videoUrl?: string | null;
 }
 
 export function CoursePlayer({
   course,
   currentLessonIndex,
   slides,
+  videoUrl,
 }: CoursePlayerProps) {
   const [playing, setPlaying] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [speed, setSpeed] = useState(1);
   const playerRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Cập nhật khi bài học thay đổi
   useEffect(() => {
-    if (!playing) return;
+    setSeconds(0);
+    setPlaying(false);
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+    }
+  }, [currentLessonIndex, videoUrl]);
+
+  // Điều khiển video HTML5 khi có videoUrl
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (playing) {
+      videoRef.current.play().catch(() => setPlaying(false));
+    } else {
+      videoRef.current.pause();
+    }
+  }, [playing]);
+
+  // Điều khiển playback rate
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+    }
+  }, [speed]);
+
+  // Timer giả lập nếu bài học KHÔNG CÓ video
+  useEffect(() => {
+    if (videoUrl || !playing) return;
     const timer = setInterval(() => {
       setSeconds((prev) => {
         if (prev >= 120) {
@@ -32,7 +63,7 @@ export function CoursePlayer({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [playing, speed]);
+  }, [playing, speed, videoUrl]);
 
   const slideIndex = Math.min(slides.length - 1, Math.floor(seconds / 30));
 
@@ -56,6 +87,44 @@ export function CoursePlayer({
     }
   };
 
+  // Nếu bài học có video URL (Cloudflare R2, Google Drive, YouTube, Vimeo...)
+  const parsed = parseVideoUrl(videoUrl);
+  if (parsed) {
+    return (
+      <div
+        ref={playerRef}
+        className="lesson-player bg-black text-white rounded-[13px] overflow-hidden flex flex-col shadow-sm relative group"
+      >
+        <div className="relative aspect-video w-full bg-black flex items-center justify-center">
+          {parsed.type === "direct" ? (
+            <video
+              key={parsed.embedUrl}
+              ref={videoRef}
+              src={parsed.embedUrl}
+              className="w-full h-full object-contain"
+              controls
+              playsInline
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+            >
+              Trình duyệt của bạn không hỗ trợ thẻ video HTML5.
+            </video>
+          ) : (
+            <iframe
+              key={parsed.embedUrl}
+              src={parsed.embedUrl}
+              title={course.title}
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Chế độ Slide mô phỏng (khi bài học chưa có video)
   return (
     <div
       ref={playerRef}
@@ -69,7 +138,7 @@ export function CoursePlayer({
           variant="outline"
           className="text-[10px] bg-white/5 text-[#c1b0cf] border-white/10 tracking-widest uppercase font-medium px-2 py-0.5"
         >
-          BÀI GIẢNG MÔ PHỎNG
+          BÀI GIẢNG SLIDE
         </Badge>
       </div>
 
@@ -107,7 +176,7 @@ export function CoursePlayer({
             {course.teacher}
           </strong>
           <small className="block text-[11px] text-[#9b8aa8]">
-            Học liệu minh họa cho demo
+            Học liệu & tài liệu khóa học
           </small>
         </div>
         <Icon

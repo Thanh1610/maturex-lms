@@ -1,12 +1,16 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageHead } from "@maturex/ui";
 import { getCourseById } from "@/features/courses/services/course-service";
-import { CourseForm } from "@/features/courses/components/course-form";
+import { CourseEditTabs } from "@/features/courses/components/course-edit-tabs";
 
 interface EditCoursePageProps {
   params: Promise<{
     id: string;
+  }>;
+  searchParams: Promise<{
+    tab?: string;
   }>;
 }
 
@@ -24,13 +28,19 @@ export async function generateMetadata({
   };
 }
 
-export default async function EditCoursePage({ params }: EditCoursePageProps) {
+export default async function EditCoursePage({
+  params,
+  searchParams,
+}: EditCoursePageProps) {
   const { id } = await params;
+  const { tab } = await searchParams;
   const course = await getCourseById(id);
 
   if (!course) {
     notFound();
   }
+
+  const initialTab = tab === "lessons" ? "lessons" : "info";
 
   return (
     <div className="courses-container pb-12 max-w-5xl mx-auto">
@@ -41,23 +51,15 @@ export default async function EditCoursePage({ params }: EditCoursePageProps) {
       />
 
       <div className="mt-6">
-        <CourseForm
-          mode="edit"
-          courseId={course.id}
-          initialData={{
-            title: course.title,
-            category: course.category,
-            description: course.description,
-            teacher: course.teacher,
-            duration: course.duration,
-            level: course.level,
-            color: course.color,
-            icon: course.icon,
-            label: course.label || "",
-            skill: course.skill || "",
-            status: course.status,
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="p-8 text-center text-xs text-[#8e829d] bg-white rounded-xl border border-[#e9eaf0]">
+              Đang tải nội dung...
+            </div>
+          }
+        >
+          <CourseEditTabs course={course} initialTab={initialTab} />
+        </Suspense>
       </div>
     </div>
   );

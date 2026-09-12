@@ -88,7 +88,6 @@ export async function getCourseById(id: string) {
     include: {
       lessons: {
         orderBy: { position: "asc" },
-        select: { title: true },
       },
       _count: {
         select: { enrollments: true },
@@ -113,8 +112,11 @@ export async function getCourseById(id: string) {
     status: course.status as "draft" | "published" | "archived",
     students: course._count.enrollments,
     lessons: course.lessons.map((l) => l.title),
+    lessonsList: course.lessons,
   };
 }
+
+export type CourseDetail = NonNullable<Awaited<ReturnType<typeof getCourseById>>>;
 
 export type UpdateCourseInput = CreateCourseInput;
 

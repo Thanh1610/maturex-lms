@@ -56,12 +56,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             {/* Quick Link to Demo */}
             <a
-              href="http://localhost:3001"
+              href="http://localhost:3002"
               target="_blank"
               rel="noreferrer"
               className="text-[11px] text-[#786a8a] bg-[#f4f0fa] hover:bg-[#ede6f7] border border-[#e4dbe8] rounded-md px-2.5 py-1 font-medium transition-colors no-underline flex items-center gap-1.5"
             >
-              <span>Bản demo (Port 3001)</span>
+              <span>Bản demo (Port 3002)</span>
               <Icon name="ArrowUpRight" size={13} />
             </a>
 

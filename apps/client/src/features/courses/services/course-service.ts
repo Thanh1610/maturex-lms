@@ -24,6 +24,7 @@ export interface ClientLessonItem {
   position: number;
   title: string;
   content: string;
+  videoUrl?: string | null;
 }
 
 export interface ClientCourseDetail extends ClientCourseListItem {
@@ -93,6 +94,7 @@ export const getPublishedCourseById = cache(
               position: true,
               title: true,
               content: true,
+              videoUrl: true,
             },
           },
           _count: {

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { PageHead } from "@maturex/ui";
 import { CourseBanner } from "./course-banner";
 import { CourseInteractiveSection } from "./course-interactive-section";
@@ -23,7 +24,10 @@ export async function CourseView() {
       <CourseBanner />
 
       {/* Client Boundary for Dynamic Tabs, Filtering & Interactive Cards */}
-      <CourseInteractiveSection initialCourses={initialCourses} />
+      <Suspense fallback={<div className="min-h-[400px]" />}>
+        <CourseInteractiveSection initialCourses={initialCourses} />
+      </Suspense>
     </div>
   );
 }
+
