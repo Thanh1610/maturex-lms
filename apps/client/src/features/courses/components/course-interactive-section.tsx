@@ -16,38 +16,56 @@ import {
   TabsTrigger,
 } from "@maturex/ui";
 import { CourseCard } from "./course-card";
-import { mockCourses } from "../mock-courses";
+import type { ClientCourseListItem } from "../services/course-service";
 
-export function CourseInteractiveSection() {
+interface CourseInteractiveSectionProps {
+  initialCourses?: ClientCourseListItem[];
+}
+
+export function CourseInteractiveSection({
+  initialCourses = [],
+}: CourseInteractiveSectionProps) {
   const [activeCategory, setActiveCategory] = useState<string>("Tất cả");
   const [levelFilter, setLevelFilter] = useState<string>("Tất cả cấp độ");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [savedIds, setSavedIds] = useState<string[]>(["ai"]);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
 
-  // Dynamic category tabs extracted from mockCourses data
+  // Danh mục tabs trích xuất động theo dữ liệu thực tế
   const dynamicCategories = useMemo(() => {
     const set = new Set<string>();
-    mockCourses.forEach((c) => {
+    initialCourses.forEach((c) => {
       if (c.category) set.add(c.category);
     });
     return ["Tất cả", ...Array.from(set)];
-  }, []);
+  }, [initialCourses]);
 
-  // Filter courses based on active dynamic category tab and level
+  // Bộ lọc dữ liệu theo Danh mục, Cấp độ và Từ khóa tìm kiếm
   const filteredCourses = useMemo(() => {
-    return mockCourses.filter((course) => {
+    const query = searchQuery.trim().toLowerCase();
+    return initialCourses.filter((course) => {
       const matchCategory =
         activeCategory === "Tất cả" || course.category === activeCategory;
       const matchLevel =
         levelFilter === "Tất cả cấp độ" || course.level === levelFilter;
-      return matchCategory && matchLevel;
+      const matchSearch =
+        query === "" ||
+        course.title.toLowerCase().includes(query) ||
+        course.description.toLowerCase().includes(query) ||
+        course.teacher.toLowerCase().includes(query);
+
+      return matchCategory && matchLevel && matchSearch;
     });
-  }, [activeCategory, levelFilter]);
+  }, [initialCourses, activeCategory, levelFilter, searchQuery]);
 
   const toggleBookmark = (id: string) => {
     setSavedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
+  };
+
+  const handleExploreAI = () => {
+    setActiveCategory("AI & Dữ liệu");
+    setSearchQuery("");
   };
 
   return (
@@ -58,12 +76,12 @@ export function CourseInteractiveSection() {
         onValueChange={setActiveCategory}
         className="w-full"
       >
-        <TabsList className="mb-5">
+        <TabsList className="mb-5 flex-wrap h-auto">
           {dynamicCategories.map((category) => {
             const count =
               category === "Tất cả"
-                ? mockCourses.length
-                : mockCourses.filter((c) => c.category === category).length;
+                ? initialCourses.length
+                : initialCourses.filter((c) => c.category === category).length;
 
             return (
               <TabsTrigger key={category} value={category}>
@@ -88,7 +106,7 @@ export function CourseInteractiveSection() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm khóa học, chủ đề, dự án…"
+            placeholder="Tìm khóa học, chủ đề, giảng viên…"
             aria-label="Tìm khóa học"
             className="pl-9 h-11 bg-white border-[var(--border,#e9eaf0)] text-xs text-[#56515f] placeholder:text-[#afa5b8] rounded-lg focus-visible:border-[#cbb8e0] focus-visible:ring-[#cbb8e0]/30"
           />
@@ -133,7 +151,7 @@ export function CourseInteractiveSection() {
       ) : (
         <Empty
           title="Chưa có khóa học phù hợp"
-          description="Thử thay đổi danh mục hoặc bộ lọc cấp độ."
+          description="Thử thay đổi từ khóa tìm kiếm, danh mục hoặc bộ lọc cấp độ."
         >
           <Button
             variant="outline"

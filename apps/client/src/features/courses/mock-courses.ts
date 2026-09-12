@@ -5,8 +5,8 @@ export interface Course {
   description: string;
   teacher: string;
   duration: string;
-  level: "Nền tảng" | "Ứng dụng" | "Nâng cao";
-  color: "lavender" | "green" | "peach" | "blue" | "pink" | "sand" | "gray";
+  level: string;
+  color: string;
   icon: string;
   label?: string;
   students: number;

@@ -53,7 +53,7 @@ export function CourseTutor({ course }: CourseTutorProps) {
   };
 
   return (
-    <Card className="tutor-panel bg-white border border-[#e9eaf0] rounded-xl p-5 shadow-none overflow-hidden flex flex-col">
+    <Card className="tutor-panel p-5 overflow-hidden flex flex-col">
       <div className="tutor-heading flex items-center gap-2.5 border-b border-[#eee8f5] pb-3.5 mb-3">
         <div className="w-8 h-8 rounded-lg bg-[#efe4f9] text-[#7d5b9f] flex items-center justify-center shrink-0">
           <Icon name="Sparkles" size={17} />

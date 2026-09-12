@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { Button, Card, Icon, Progress, toast } from "@maturex/ui";
 import { APP_ROUTES } from "@/lib/api-routes";
+import type { ClientCourseListItem } from "../services/course-service";
 import type { Course } from "../mock-courses";
+
+type CourseCardData = ClientCourseListItem | Course;
 
 export function CourseCover({
   course,
   small = false,
 }: {
-  course: Course;
+  course: CourseCardData;
   small?: boolean;
 }) {
   return (
@@ -38,14 +41,14 @@ export function CourseCard({
   isSaved,
   onToggleBookmark,
 }: {
-  course: Course;
+  course: CourseCardData;
   isSaved?: boolean;
   onToggleBookmark?: () => void;
 }) {
   const courseUrl = `${APP_ROUTES.courses}/${course.id}`;
 
   return (
-    <Card className="course-card relative rounded-[11px] bg-white border border-[var(--border,#e9eaf0)] overflow-hidden transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_25px_#4435500b] flex flex-col p-0 gap-0">
+    <Card className="course-card relative overflow-hidden transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_25px_#4435500b] flex flex-col p-0 gap-0">
       <Link
         href={courseUrl}
         className="cover-link p-0 w-full h-auto block text-left cursor-pointer rounded-none"

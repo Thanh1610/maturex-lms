@@ -1,12 +1,15 @@
 import { PageHead } from "@maturex/ui";
 import { CourseBanner } from "./course-banner";
 import { CourseInteractiveSection } from "./course-interactive-section";
+import { getPublishedCourses } from "../services/course-service";
 
 /**
  * CourseView - Server Component (SSR by default)
- * Only interactive filters and cards run as client boundaries.
+ * Fetches published courses directly from Postgres via Prisma.
  */
-export function CourseView() {
+export async function CourseView() {
+  const initialCourses = await getPublishedCourses();
+
   return (
     <div className="courses-container pb-12">
       {/* SSR Header */}
@@ -20,7 +23,7 @@ export function CourseView() {
       <CourseBanner />
 
       {/* Client Boundary for Dynamic Tabs, Filtering & Interactive Cards */}
-      <CourseInteractiveSection />
+      <CourseInteractiveSection initialCourses={initialCourses} />
     </div>
   );
 }

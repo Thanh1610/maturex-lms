@@ -18,18 +18,20 @@ export function CourseCurriculum({
   completedLessons,
   onSelectLesson,
 }: CourseCurriculumProps) {
-  const percentCompleted = Math.round(
-    (completedLessons.length / course.lessons.length) * 100
-  );
+  const totalLessons = course.lessons.length;
+  const percentCompleted =
+    totalLessons > 0
+      ? Math.round((completedLessons.length / totalLessons) * 100)
+      : 0;
 
   return (
-    <Card className="curriculum-panel bg-white border border-[#e9eaf0] rounded-xl p-5 shadow-none">
+    <Card className="curriculum-panel p-5">
       <div className="flex items-center justify-between mb-1.5">
         <h3 className="text-xs font-semibold text-[#57446b] m-0">
           Nội dung khóa học
         </h3>
         <span className="text-[11px] font-medium text-[#8f839d]">
-          {completedLessons.length}/{course.lessons.length}
+          {completedLessons.length}/{totalLessons}
         </span>
       </div>
 

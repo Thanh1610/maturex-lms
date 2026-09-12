@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Icon, toast } from "@maturex/ui";
 import type { Course } from "../mock-courses";
+import type { ClientCourseDetail } from "../services/course-service";
 import { topicDetails } from "../mock-courses";
 import { CourseCurriculum } from "./course-curriculum";
 import { CourseDetailHeader } from "./course-detail-header";
@@ -11,7 +12,7 @@ import { CourseTabsContent } from "./course-tabs-content";
 import { CourseTutor } from "./course-tutor";
 
 interface CourseDetailViewProps {
-  course: Course;
+  course: ClientCourseDetail | Course;
 }
 
 export function CourseDetailView({ course }: CourseDetailViewProps) {
@@ -19,14 +20,22 @@ export function CourseDetailView({ course }: CourseDetailViewProps) {
   const [enrolled, setEnrolled] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
 
-  const slides =
-    topicDetails[course.id] ||
-    topicDetails.ai || [
-      course.title,
-      "Nêu bối cảnh, mục tiêu và yêu cầu cốt lõi.",
-      "Đối chiếu tài liệu và tiến hành thực hành.",
-      "Tự kiểm tra kết quả và tổng kết bài học.",
-    ];
+  // Đọc nội dung slide từ DB lesson nếu có, fallback về topicDetails hoặc mặc định
+  const detailCourse = "lessonsList" in course ? (course as ClientCourseDetail) : null;
+  const currentLessonContent = detailCourse?.lessonsList?.[currentLesson]?.content;
+
+  const slides = currentLessonContent
+    ? currentLessonContent
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : topicDetails[course.id] ||
+      topicDetails.ai || [
+        course.title,
+        "Nêu bối cảnh, mục tiêu và yêu cầu cốt lõi.",
+        "Đối chiếu tài liệu và tiến hành thực hành.",
+        "Tự kiểm tra kết quả và tổng kết bài học.",
+      ];
 
   const isCurrentLessonDone = completedLessons.includes(currentLesson);
 
@@ -72,7 +81,7 @@ export function CourseDetailView({ course }: CourseDetailViewProps) {
                 BẠN ĐANG HỌC
               </span>
               <h3 className="text-sm font-semibold text-[#483959] m-0">
-                {course.lessons[currentLesson]}
+                {course.lessons[currentLesson] || "Bài học giới thiệu"}
               </h3>
             </div>
 
