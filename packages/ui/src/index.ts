@@ -16,5 +16,8 @@ export * from "./components/form";
 export * from "./components/dropdown-menu";
 export * from "./components/tabs";
 export * from "./components/select";
+export * from "./components/table";
+export * from "./components/dialog";
+export * from "./components/tooltip";
 export * from "./components/sonner";
 export * from "./lib/use-mobile";

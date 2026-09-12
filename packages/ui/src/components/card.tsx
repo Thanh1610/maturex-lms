@@ -1,13 +1,25 @@
 import type * as React from "react";
 import { cn } from "../lib/utils";
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+export interface CardProps extends React.ComponentProps<"div"> {
+  variant?: "default" | "flat" | "elevated" | "outline";
+}
+
+function Card({ className, variant = "flat", ...props }: CardProps) {
+  const variantStyles = {
+    default: "border bg-card shadow-sm text-card-foreground",
+    flat: "border border-[#e9eaf0] bg-white shadow-none text-card-foreground",
+    elevated: "border border-[#e9eaf0] bg-white shadow-md text-card-foreground",
+    outline: "border border-border bg-transparent shadow-none text-card-foreground",
+  };
+
   return (
     <div
       data-slot="card"
       className={cn(
-        "flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm",
-        className,
+        "rounded-xl transition-colors",
+        variantStyles[variant],
+        className
       )}
       {...props}
     />

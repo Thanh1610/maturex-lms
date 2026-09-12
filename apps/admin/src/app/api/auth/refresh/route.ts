@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   AuthError,
-  authenticateWithPassword,
+  refreshSession,
 } from "@/features/auth/services/auth-service";
 import {
   ACCESS_TOKEN_MAX_AGE_SECONDS,
@@ -14,19 +14,15 @@ const REFRESH_COOKIE_NAME = "mx_refresh_token";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const email = typeof body.email === "string" ? body.email : "";
-    const password = typeof body.password === "string" ? body.password : "";
+    const cookieStore = await cookies();
+    const currentRefreshToken = cookieStore.get(REFRESH_COOKIE_NAME)?.value;
 
-    const { user, accessToken, refreshToken } = await authenticateWithPassword(
-      email,
-      password,
-    );
+    const { user, accessToken, refreshToken } =
+      await refreshSession(currentRefreshToken);
 
     const isSecure = req.nextUrl.protocol === "https:";
-    const cookieStore = await cookies();
 
-    // Set Access Token (15m)
+    // Set rotated Access Token
     cookieStore.set({
       name: ACCESS_COOKIE_NAME,
       value: accessToken,
@@ -37,7 +33,7 @@ export async function POST(req: NextRequest) {
       maxAge: ACCESS_TOKEN_MAX_AGE_SECONDS,
     });
 
-    // Set Refresh Token (7d)
+    // Set rotated Refresh Token
     cookieStore.set({
       name: REFRESH_COOKIE_NAME,
       value: refreshToken,
@@ -56,11 +52,7 @@ export async function POST(req: NextRequest) {
         { status: error.status },
       );
     }
-    // Log internal error on server console, return friendly error to client
-    console.error("[Login Error]:", error);
-    return NextResponse.json(
-      { error: "Hệ thống gặp sự cố khi xác thực. Vui lòng thử lại sau." },
-      { status: 500 },
-    );
+    const message = error instanceof Error ? error.message : "Có lỗi xảy ra";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

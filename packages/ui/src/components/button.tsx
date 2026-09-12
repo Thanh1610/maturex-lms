@@ -89,8 +89,14 @@ function Button({
       )}
       {...props}
     >
-      {icon && <Icon name={icon} size={15} />}
-      {children}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {icon && <Icon name={icon} size={15} />}
+          {children}
+        </>
+      )}
     </Comp>
   );
 }

@@ -12,7 +12,15 @@ const beVietnamPro = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   title: "MatureX · Không gian học tập",
   description: "Hệ thống quản trị và đào tạo học tập trực tuyến MatureX",
+  icons: {
+    icon: "/logo_mobile.webp",
+    shortcut: "/logo_mobile.webp",
+    apple: "/logo_mobile.webp",
+  },
 };
+
+import { AppLayout } from "@/components/layout/app-layout";
+import { Toaster } from "@maturex/ui";
 
 export default function RootLayout({
   children,
@@ -21,7 +29,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" className={`${beVietnamPro.variable} h-full`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <AppLayout>{children}</AppLayout>
+        <Toaster richColors position="top-right" />
+      </body>
     </html>
   );
 }

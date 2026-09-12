@@ -79,14 +79,13 @@ model Course {
   title       String       @db.VarChar(180)
   description String       @db.Text
   category    String       @db.VarChar(100)
-  teacherName String       @default("MatureX") @map("teacher_name") @db.VarChar(100)
+  teacher     String       @default("MatureX") @db.VarChar(100)
   duration    String       @default("2 giờ") @db.VarChar(50)
   level       String       @default("Nền tảng") @db.VarChar(50)
   color       String       @default("lavender") @db.VarChar(50)
   icon        String       @default("Sparkles") @db.VarChar(50)
   label       String       @default("") @db.VarChar(100)
   skill       String       @default("") @db.VarChar(100)
-  exercise    String       @default("") @db.Text
   status      CourseStatus @default(published)
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")

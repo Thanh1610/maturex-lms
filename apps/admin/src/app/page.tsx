@@ -1,22 +1,12 @@
-import { Button } from "@maturex/ui";
-
-export default function AdminPage() {
+export default function HomePage() {
   return (
-    <main className="p-10 flex flex-col items-center justify-center min-h-screen text-center">
-      <h1 className="text-3xl font-bold text-[#393245] mb-4">
-        MatureX Admin Management
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 bg-white rounded-xl border border-[var(--border,#e9eaf0)] shadow-xs">
+      <h1 className="text-2xl font-bold text-[#393245] mb-2">
+        Bảng điều khiển Quản trị · MatureX LMS
       </h1>
-      <p className="text-muted-foreground mb-6 max-w-md">
-        Không gian quản trị đào tạo, thống kê người dùng và khóa học. Phân hệ sẵn sàng để phát triển.
+      <p className="text-sm text-[#737381] max-w-md">
+        Hệ thống quản lý đào tạo, khóa học và phân quyền học viên dành cho Quản trị viên.
       </p>
-      <div className="flex gap-4">
-        <a href="http://localhost:3000">
-          <Button variant="outline">Sang Client (Port 3000)</Button>
-        </a>
-        <a href="http://localhost:3001">
-          <Button variant="secondary">Sang Demo (Port 3001)</Button>
-        </a>
-      </div>
-    </main>
+    </div>
   );
 }
