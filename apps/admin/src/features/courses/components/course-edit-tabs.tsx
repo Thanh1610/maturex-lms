@@ -1,24 +1,31 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maturex/ui";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { CourseDetail } from "../services/course-service";
 import { CourseForm } from "./course-form";
 import { CourseLessonsManager } from "./course-lessons-manager";
-import type { CourseDetail } from "../services/course-service";
 
 interface CourseEditTabsProps {
   course: CourseDetail;
   initialTab?: "info" | "lessons";
 }
 
-export function CourseEditTabs({ course, initialTab = "info" }: CourseEditTabsProps) {
+export function CourseEditTabs({
+  course,
+  initialTab = "info",
+}: CourseEditTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   // Đọc tab từ URL query param, nếu chưa có thì dùng initialTab truyền từ Server Component
   const tabParam = searchParams.get("tab");
-  const currentTab = tabParam ? (tabParam === "lessons" ? "lessons" : "info") : initialTab;
+  const currentTab = tabParam
+    ? tabParam === "lessons"
+      ? "lessons"
+      : "info"
+    : initialTab;
 
   const handleTabChange = (val: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -38,8 +45,13 @@ export function CourseEditTabs({ course, initialTab = "info" }: CourseEditTabsPr
         <TabsTrigger value="info" className="text-xs flex items-center gap-2">
           <span className="font-semibold">Thông tin chung & Cài đặt</span>
         </TabsTrigger>
-        <TabsTrigger value="lessons" className="text-xs flex items-center gap-2">
-          <span className="font-semibold">Nội dung bài học ({course.lessonsList.length})</span>
+        <TabsTrigger
+          value="lessons"
+          className="text-xs flex items-center gap-2"
+        >
+          <span className="font-semibold">
+            Nội dung bài học ({course.lessonsList.length})
+          </span>
         </TabsTrigger>
       </TabsList>
 

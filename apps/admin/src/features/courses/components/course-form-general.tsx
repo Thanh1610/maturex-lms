@@ -1,14 +1,25 @@
-import { Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maturex/ui";
 import {
-  type CourseFormData,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@maturex/ui";
+import {
   COURSE_CATEGORY_SUGGESTIONS,
+  type CourseFormData,
 } from "../constants/course-constants";
 
 interface CourseFormGeneralProps {
   formData: CourseFormData;
   errors: Record<string, string>;
   customCategory: string;
-  onUpdateField: <K extends keyof CourseFormData>(field: K, value: CourseFormData[K]) => void;
+  onUpdateField: <K extends keyof CourseFormData>(
+    field: K,
+    value: CourseFormData[K],
+  ) => void;
   onCategorySelect: (value: string) => void;
   onCustomCategoryChange: (value: string) => void;
 }
@@ -23,7 +34,7 @@ export function CourseFormGeneral({
 }: CourseFormGeneralProps) {
   const isCustom =
     !COURSE_CATEGORY_SUGGESTIONS.includes(
-      formData.category as (typeof COURSE_CATEGORY_SUGGESTIONS)[number]
+      formData.category as (typeof COURSE_CATEGORY_SUGGESTIONS)[number],
     ) || customCategory !== "";
 
   return (
@@ -33,7 +44,8 @@ export function CourseFormGeneral({
           Thông tin chung khóa học
         </h3>
         <p className="text-xs text-[#80768e]">
-          Các thông tin cơ bản sẽ hiển thị trên thẻ và trang tổng quan của học viên.
+          Các thông tin cơ bản sẽ hiển thị trên thẻ và trang tổng quan của học
+          viên.
         </p>
       </div>
 
@@ -56,8 +68,11 @@ export function CourseFormGeneral({
 
       {/* Description */}
       <div className="space-y-2">
-        <Label htmlFor="description" className="text-xs font-semibold text-[#483c58]">
-          Mô tả khóa học <span className="text-red-500">*</span>
+        <Label
+          htmlFor="description"
+          className="text-xs font-semibold text-[#483c58]"
+        >
+          Tổng quan khóa học <span className="text-red-500">*</span>
         </Label>
         <textarea
           id="description"
@@ -75,13 +90,16 @@ export function CourseFormGeneral({
       {/* Category & Teacher */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category" className="text-xs font-semibold text-[#483c58]">
+          <Label
+            htmlFor="category"
+            className="text-xs font-semibold text-[#483c58]"
+          >
             Danh mục khóa học <span className="text-red-500">*</span>
           </Label>
           <Select
             value={
               COURSE_CATEGORY_SUGGESTIONS.includes(
-                formData.category as (typeof COURSE_CATEGORY_SUGGESTIONS)[number]
+                formData.category as (typeof COURSE_CATEGORY_SUGGESTIONS)[number],
               )
                 ? formData.category
                 : "__custom__"
@@ -118,8 +136,12 @@ export function CourseFormGeneral({
 
         {/* Teacher name */}
         <div className="space-y-2">
-          <Label htmlFor="teacher" className="text-xs font-semibold text-[#483c58]">
-            Tác giả / Giảng viên phụ trách <span className="text-red-500">*</span>
+          <Label
+            htmlFor="teacher"
+            className="text-xs font-semibold text-[#483c58]"
+          >
+            Tác giả / Giảng viên phụ trách{" "}
+            <span className="text-red-500">*</span>
           </Label>
           <Input
             id="teacher"
@@ -140,7 +162,10 @@ export function CourseFormGeneral({
       {/* Label Badge & Skill Meta */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
         <div className="space-y-2">
-          <Label htmlFor="label" className="text-xs font-semibold text-[#483c58]">
+          <Label
+            htmlFor="label"
+            className="text-xs font-semibold text-[#483c58]"
+          >
             Nhãn hiển thị (Label / Badge)
           </Label>
           <Input
@@ -153,7 +178,10 @@ export function CourseFormGeneral({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="skill" className="text-xs font-semibold text-[#483c58]">
+          <Label
+            htmlFor="skill"
+            className="text-xs font-semibold text-[#483c58]"
+          >
             Kỹ năng rèn luyện (Skill)
           </Label>
           <Input

@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button, Card, Icon, toast } from "@maturex/ui";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { APP_ROUTES } from "@/lib/api-routes";
-import {
-  type CourseFormData,
-  type CourseFormMode,
-  COURSE_CATEGORY_SUGGESTIONS,
-} from "../constants/course-constants";
 import {
   createCourseAction,
   updateCourseAction,
 } from "../actions/course-actions";
+import {
+  COURSE_CATEGORY_SUGGESTIONS,
+  type CourseFormData,
+  type CourseFormMode,
+} from "../constants/course-constants";
 import { CourseFormGeneral } from "./course-form-general";
 import { CourseFormSettings } from "./course-form-settings";
 
@@ -45,17 +45,18 @@ export function CourseForm({ mode, initialData, courseId }: CourseFormProps) {
   });
   const [customCategory, setCustomCategory] = useState(
     COURSE_CATEGORY_SUGGESTIONS.includes(
-      (initialData?.category || DEFAULT_FORM_VALUES.category) as (typeof COURSE_CATEGORY_SUGGESTIONS)[number]
+      (initialData?.category ||
+        DEFAULT_FORM_VALUES.category) as (typeof COURSE_CATEGORY_SUGGESTIONS)[number],
     )
       ? ""
-      : initialData?.category || ""
+      : initialData?.category || "",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const updateField = <K extends keyof CourseFormData>(
     field: K,
-    value: CourseFormData[K]
+    value: CourseFormData[K],
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -84,8 +85,11 @@ export function CourseForm({ mode, initialData, courseId }: CourseFormProps) {
     if (!formData.title.trim() || formData.title.trim().length < 3) {
       newErrors.title = "Tiêu đề khóa học phải có ít nhất 3 ký tự";
     }
-    if (!formData.description.trim() || formData.description.trim().length < 10) {
-      newErrors.description = "Mô tả khóa học phải có ít nhất 10 ký tự";
+    if (
+      !formData.description.trim() ||
+      formData.description.trim().length < 10
+    ) {
+      newErrors.description = "Tổng quan khóa học phải có ít nhất 10 ký tự";
     }
     if (!formData.category.trim()) {
       newErrors.category = "Vui lòng chọn hoặc nhập danh mục";
@@ -162,10 +166,7 @@ export function CourseForm({ mode, initialData, courseId }: CourseFormProps) {
 
         {/* Sidebar: Settings, Themes & Publishing */}
         <div className="space-y-6">
-          <CourseFormSettings
-            formData={formData}
-            onUpdateField={updateField}
-          />
+          <CourseFormSettings formData={formData} onUpdateField={updateField} />
         </div>
       </div>
 
@@ -194,8 +195,8 @@ export function CourseForm({ mode, initialData, courseId }: CourseFormProps) {
               {isSubmitting
                 ? "Đang xử lý..."
                 : mode === "create"
-                ? "Khởi tạo khóa học"
-                : "Lưu thay đổi"}
+                  ? "Khởi tạo khóa học"
+                  : "Lưu thay đổi"}
             </span>
           </Button>
         </div>

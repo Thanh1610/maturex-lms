@@ -27,13 +27,43 @@ export const COURSE_STATUS_OPTIONS = [
 ] as const;
 
 export const COURSE_COLOR_OPTIONS = [
-  { value: "lavender", label: "Lavender (Tím nhạt)", bg: "#e8dcf5", border: "#c8b0e8" },
-  { value: "green", label: "Green (Xanh lá)", bg: "#ddf3e4", border: "#9ddcb0" },
-  { value: "peach", label: "Peach (Cam đào)", bg: "#fde2d4", border: "#f6b89c" },
-  { value: "blue", label: "Blue (Xanh dương)", bg: "#d9eafc", border: "#9ec4f5" },
-  { value: "pink", label: "Pink (Hồng pastel)", bg: "#fce0ec", border: "#f5adc8" },
+  {
+    value: "lavender",
+    label: "Lavender (Tím nhạt)",
+    bg: "#e8dcf5",
+    border: "#c8b0e8",
+  },
+  {
+    value: "green",
+    label: "Green (Xanh lá)",
+    bg: "#ddf3e4",
+    border: "#9ddcb0",
+  },
+  {
+    value: "peach",
+    label: "Peach (Cam đào)",
+    bg: "#fde2d4",
+    border: "#f6b89c",
+  },
+  {
+    value: "blue",
+    label: "Blue (Xanh dương)",
+    bg: "#d9eafc",
+    border: "#9ec4f5",
+  },
+  {
+    value: "pink",
+    label: "Pink (Hồng pastel)",
+    bg: "#fce0ec",
+    border: "#f5adc8",
+  },
   { value: "sand", label: "Sand (Vàng cát)", bg: "#f5edd8", border: "#dfcf9e" },
-  { value: "gray", label: "Gray (Xám thanh lịch)", bg: "#ebebed", border: "#cbcbcf" },
+  {
+    value: "gray",
+    label: "Gray (Xám thanh lịch)",
+    bg: "#ebebed",
+    border: "#cbcbcf",
+  },
 ] as const;
 
 export const COURSE_ICON_OPTIONS = [

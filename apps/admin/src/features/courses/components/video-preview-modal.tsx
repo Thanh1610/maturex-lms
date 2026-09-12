@@ -3,9 +3,8 @@
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
+  DialogTitle,
   Icon,
 } from "@maturex/ui";
 import { parseVideoUrl } from "@/lib/video-url-helper";
@@ -38,10 +37,10 @@ export function VideoPreviewModal({
               {parsed?.type === "drive"
                 ? "Nguồn: Google Drive"
                 : parsed?.type === "youtube"
-                ? "Nguồn: YouTube"
-                : parsed?.type === "vimeo"
-                ? "Nguồn: Vimeo"
-                : "Nguồn: Video trực tiếp (Cloudflare R2)"}
+                  ? "Nguồn: YouTube"
+                  : parsed?.type === "vimeo"
+                    ? "Nguồn: Vimeo"
+                    : "Nguồn: Video trực tiếp (Cloudflare R2)"}
             </DialogDescription>
           </div>
         </div>
@@ -50,7 +49,11 @@ export function VideoPreviewModal({
         <div className="relative aspect-video w-full bg-black flex items-center justify-center">
           {!parsed ? (
             <div className="text-center p-6 text-white/60 text-xs">
-              <Icon name="AlertCircle" size={24} className="mx-auto mb-2 text-white/40" />
+              <Icon
+                name="AlertCircle"
+                size={24}
+                className="mx-auto mb-2 text-white/40"
+              />
               Không có đường dẫn video hợp lệ.
             </div>
           ) : parsed.type === "direct" ? (

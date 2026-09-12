@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button, Card } from "@maturex/ui";
@@ -7,6 +8,7 @@ import { APP_ROUTES } from "@/lib/api-routes";
 
 interface CoursePageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ lesson?: string }>;
 }
 
 export async function generateMetadata({
@@ -27,8 +29,12 @@ export async function generateMetadata({
   };
 }
 
-export default async function CourseDetailPage({ params }: CoursePageProps) {
+export default async function CourseDetailPage({
+  params,
+  searchParams,
+}: CoursePageProps) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const course = await getPublishedCourseById(id);
 
   if (!course) {
@@ -49,5 +55,13 @@ export default async function CourseDetailPage({ params }: CoursePageProps) {
     );
   }
 
-  return <CourseDetailView course={course} />;
+  return (
+    <Suspense fallback={<div className="min-h-[500px]" />}>
+      <CourseDetailView
+        course={course}
+        initialLessonParam={resolvedSearchParams?.lesson}
+      />
+    </Suspense>
+  );
 }
+

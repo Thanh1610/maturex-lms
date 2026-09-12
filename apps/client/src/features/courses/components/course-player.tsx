@@ -1,94 +1,83 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Badge, Button, Icon, toast } from "@maturex/ui";
+import { Empty, Icon } from "@maturex/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseVideoUrl } from "@/lib/video-url-helper";
-import type { Course } from "../mock-courses";
 
 interface CoursePlayerProps {
-  course: Course;
-  currentLessonIndex: number;
-  slides: string[];
+  courseTitle: string;
+  lessonTitle: string;
   videoUrl?: string | null;
+  slideUrl?: string | null;
+  content?: string;
 }
 
 export function CoursePlayer({
-  course,
-  currentLessonIndex,
-  slides,
+  courseTitle,
+  lessonTitle,
   videoUrl,
+  slideUrl,
+  content = "",
 }: CoursePlayerProps) {
-  const [playing, setPlaying] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [speed, setSpeed] = useState(1);
+  const [, setPlaying] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewerEngine, setViewerEngine] = useState<"office" | "google">(
+    "office",
+  );
   const playerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Cập nhật khi bài học thay đổi
-  useEffect(() => {
-    setSeconds(0);
-    setPlaying(false);
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
+  // Phân tách slide từ nội dung: hỗ trợ dấu phân đoạn "---" hoặc các đoạn văn 2 dòng trống
+  const slides = useMemo(() => {
+    if (!content.trim()) return [];
+    if (content.includes("---")) {
+      return content
+        .split("---")
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
-  }, [currentLessonIndex, videoUrl]);
+    // Nếu không có "---", tách theo đoạn văn bản
+    const paragraphs = content
+      .split(/\n\s*\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return paragraphs.length > 0 ? paragraphs : [content.trim()];
+  }, [content]);
 
-  // Điều khiển video HTML5 khi có videoUrl
+  // Reset slide index khi chuyển bài học
   useEffect(() => {
-    if (!videoRef.current) return;
-    if (playing) {
-      videoRef.current.play().catch(() => setPlaying(false));
-    } else {
-      videoRef.current.pause();
-    }
-  }, [playing]);
+    setCurrentSlide(0);
+  }, [lessonTitle, videoUrl, slideUrl]);
 
-  // Điều khiển playback rate
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-    }
-  }, [speed]);
-
-  // Timer giả lập nếu bài học KHÔNG CÓ video
-  useEffect(() => {
-    if (videoUrl || !playing) return;
-    const timer = setInterval(() => {
-      setSeconds((prev) => {
-        if (prev >= 120) {
-          setPlaying(false);
-          return 120;
-        }
-        return Math.min(120, prev + speed);
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [playing, speed, videoUrl]);
-
-  const slideIndex = Math.min(slides.length - 1, Math.floor(seconds / 30));
-
-  const formatTime = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const secs = Math.floor(totalSeconds % 60)
-      .toString()
-      .padStart(2, "0");
-    return `${mins}:${secs}`;
-  };
-
-  const handleToggleFullscreen = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    } else {
-      playerRef.current?.requestFullscreen?.().catch(() => {
-        toast.error("Trình duyệt không hỗ trợ chế độ toàn màn hình.");
-      });
-    }
-  };
-
-  // Nếu bài học có video URL (Cloudflare R2, Google Drive, YouTube, Vimeo...)
   const parsed = parseVideoUrl(videoUrl);
+
+  // Toggle fullscreen cho slide
+  const handleToggleFullscreen = () => {
+    if (!playerRef.current) return;
+    if (!document.fullscreenElement) {
+      playerRef.current
+        .requestFullscreen?.()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {});
+    } else {
+      document
+        .exitFullscreen?.()
+        .then(() => setIsFullscreen(false))
+        .catch(() => {});
+    }
+  };
+
+  // Lắng nghe sự kiện fullscreenchange
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  // 1. Nếu có video -> Ưu tiên phát video
   if (parsed) {
     return (
       <div
@@ -113,7 +102,7 @@ export function CoursePlayer({
             <iframe
               key={parsed.embedUrl}
               src={parsed.embedUrl}
-              title={course.title}
+              title={`${courseTitle} - ${lessonTitle}`}
               className="w-full h-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
@@ -124,124 +113,225 @@ export function CoursePlayer({
     );
   }
 
-  // Chế độ Slide mô phỏng (khi bài học chưa có video)
-  return (
-    <div
-      ref={playerRef}
-      className="lesson-player bg-[#40384f] text-[#ddd1e8] rounded-[13px] overflow-hidden min-h-[370px] min-[1500px]:min-h-[440px] flex flex-col shadow-sm"
-    >
-      <div className="player-top p-[18px_24px] flex items-center justify-between text-xs tracking-[-0.3px] border-b border-white/10">
-        <span className="font-semibold text-white/80">
-          mature<span className="text-[#7cbfa2]">x</span> / classroom
-        </span>
-        <Badge
-          variant="outline"
-          className="text-[10px] bg-white/5 text-[#c1b0cf] border-white/10 tracking-widest uppercase font-medium px-2 py-0.5"
-        >
-          BÀI GIẢNG SLIDE
-        </Badge>
-      </div>
+  // 2. Nếu có tệp slide (PowerPoint .pptx hoặc .pdf) -> Nhúng Viewer trực tiếp với cơ chế Fallback
+  if (slideUrl) {
+    const isPdf = slideUrl.toLowerCase().includes(".pdf");
+    const isLocal =
+      typeof window !== "undefined" &&
+      (slideUrl.includes("localhost") ||
+        slideUrl.includes("127.0.0.1") ||
+        slideUrl.startsWith("/"));
 
-      <div className="slide-content p-7 sm:p-9 flex-1 min-h-[200px] flex flex-col justify-between">
-        <div>
-          <span className="text-[10px] uppercase tracking-wider text-[#a896b6] font-semibold">
-            BÀI {currentLessonIndex + 1} / {course.lessons[currentLessonIndex]}
-          </span>
-          <h2 className="text-xl sm:text-2xl min-[1500px]:text-3xl font-normal leading-relaxed max-w-[620px] my-4 text-[#eee4f4]">
-            {slides[slideIndex] || course.title}
-          </h2>
-        </div>
+    const embedSrc = isPdf
+      ? slideUrl
+      : viewerEngine === "office"
+        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(slideUrl)}`
+        : `https://docs.google.com/viewer?url=${encodeURIComponent(slideUrl)}&embedded=true`;
 
-        <div className="slide-pagination flex gap-1.5 pt-4">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                slideIndex === i ? "w-6 bg-[#c7b2d8]" : "w-1.5 bg-[#8c7897]/40 hover:bg-[#8c7897]/70"
-              }`}
-              onClick={() => setSeconds(i * 30)}
-              aria-label={`Đến phần ${i + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="player-speaker flex items-center gap-3 px-7 sm:px-9 pb-5">
-        <div className="w-8 h-8 rounded-full bg-[#b39abe]/20 text-[#ccb6d9] flex items-center justify-center font-semibold text-xs shrink-0">
-          {course.teacher.slice(0, 1)}
-        </div>
-        <div>
-          <strong className="block text-xs font-semibold text-[#d9c5e3]">
-            {course.teacher}
-          </strong>
-          <small className="block text-[11px] text-[#9b8aa8]">
-            Học liệu & tài liệu khóa học
-          </small>
-        </div>
-        <Icon
-          name={course.icon}
-          size={36}
-          className="ml-auto text-white/10 pointer-events-none"
-        />
-      </div>
-
-      <div className="player-controls bg-[#352f41] p-3 sm:px-5">
-        <input
-          type="range"
-          min="0"
-          max="120"
-          value={seconds}
-          onChange={(e) => setSeconds(Number(e.target.value))}
-          aria-label="Vị trí bài giảng"
-          className="w-full h-1 mb-2.5 accent-[#b39ac9] cursor-pointer block rounded-lg bg-[#534b62]"
-        />
-
-        <div className="flex items-center justify-between text-xs text-[#c9b7d5]">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-[#c9b7d5] hover:text-white hover:bg-white/10 p-0 cursor-pointer"
-              onClick={() => {
-                if (seconds >= 120) setSeconds(0);
-                setPlaying(!playing);
-              }}
-              aria-label={playing ? "Tạm dừng bài giảng" : "Phát bài giảng"}
-            >
-              <Icon name={playing ? "Pause" : "Play"} size={18} />
-            </Button>
-            <span className="font-mono text-[11px]">
-              {formatTime(seconds)} / 02:00
+    return (
+      <div
+        ref={playerRef}
+        className="lesson-player bg-[#1f1a26] text-white rounded-[13px] overflow-hidden flex flex-col shadow-sm relative border border-[#3e344a]"
+      >
+        {/* Slide Bar Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2538] border-b border-white/10 text-xs gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="bg-[#71548e] text-white text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+              {isPdf ? "PDF SLIDE" : "POWERPOINT"}
+            </span>
+            <span className="text-white/80 font-medium truncate max-w-[160px] sm:max-w-xs">
+              {lessonTitle}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              aria-label="Tốc độ phát"
-              value={speed}
-              onChange={(e) => setSpeed(Number(e.target.value))}
-              className="bg-[#2a2534] text-[#c9b7d5] text-xs px-2 py-1 rounded border border-white/10 outline-none cursor-pointer"
-            >
-              {[1, 1.5, 2].map((val) => (
-                <option key={val} value={val} className="bg-[#2a2534]">
-                  {val}×
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Nếu không phải PDF và không phải Localhost: cho phép chuyển đổi giữa Microsoft Viewer & Google Viewer */}
+            {!isPdf && !isLocal && (
+              <div className="flex items-center bg-white/5 rounded p-0.5 border border-white/10 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setViewerEngine("office")}
+                  className={`px-2 py-0.5 rounded transition-colors cursor-pointer border-0 ${
+                    viewerEngine === "office"
+                      ? "bg-[#71548e] text-white font-medium"
+                      : "text-white/70 hover:text-white bg-transparent"
+                  }`}
+                  title="Xem qua Microsoft Office Online"
+                >
+                  Office
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewerEngine("google")}
+                  className={`px-2 py-0.5 rounded transition-colors cursor-pointer border-0 ${
+                    viewerEngine === "google"
+                      ? "bg-[#71548e] text-white font-medium"
+                      : "text-white/70 hover:text-white bg-transparent"
+                  }`}
+                  title="Xem qua Google Docs Viewer"
+                >
+                  Google
+                </button>
+              </div>
+            )}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-[#c9b7d5] hover:text-white hover:bg-white/10 p-0 cursor-pointer"
-              onClick={handleToggleFullscreen}
-              aria-label="Toàn màn hình"
+            <a
+              href={slideUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-[#c9b7de] hover:text-white px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+              title="Tải tệp slide về máy"
             >
-              <Icon name="Maximize2" size={16} />
-            </Button>
+              <Icon name="Download" size={13} />
+              <span className="hidden sm:inline">Tải về</span>
+            </a>
+            <button
+              type="button"
+              onClick={handleToggleFullscreen}
+              className="flex items-center gap-1 text-[11px] text-white/80 hover:text-white px-2 py-1 rounded hover:bg-white/10 transition-colors border-0 bg-transparent cursor-pointer"
+              title={isFullscreen ? "Thu nhỏ màn hình" : "Toàn màn hình"}
+            >
+              <Icon name={isFullscreen ? "Minimize2" : "Maximize2"} size={14} />
+            </button>
           </div>
         </div>
+
+        {/* Embedded Iframe Viewer hoặc Localhost Warning Banner */}
+        <div className="relative aspect-video w-full bg-[#17131d]">
+          {!isPdf && isLocal ? (
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-[#71548e]/20 text-[#c8b3dc] flex items-center justify-center mb-3">
+                <Icon name="FileText" size={24} />
+              </div>
+              <h4 className="text-sm font-semibold text-white mb-1">
+                Tệp trình chiếu PowerPoint (Local URL)
+              </h4>
+              <p className="text-xs text-white/60 max-w-md mb-4 leading-relaxed">
+                Máy chủ Microsoft/Google Online Viewer không thể truy cập trực
+                tiếp các địa chỉ nội bộ (localhost hoặc private storage). Bạn có
+                thể tải file hoặc mở trực tiếp trên thiết bị:
+              </p>
+              <div className="flex items-center gap-3">
+                <a
+                  href={slideUrl}
+                  download
+                  className="flex items-center gap-1.5 text-xs bg-[#71548e] hover:bg-[#8363a4] text-white font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Icon name="Download" size={14} />
+                  Tải slide (.pptx)
+                </a>
+                <a
+                  href={slideUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/15 text-white/90 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Icon name="ExternalLink" size={14} />
+                  Mở liên kết
+                </a>
+              </div>
+            </div>
+          ) : (
+            <iframe
+              key={embedSrc}
+              src={embedSrc}
+              title={`Slide bài học: ${lessonTitle}`}
+              className="w-full h-full border-0"
+              allowFullScreen
+            />
+          )}
+        </div>
       </div>
+    );
+  }
+
+  // 3. Nếu không có video nhưng có nội dung slide -> Hiển thị trình chiếu Slide tương tác xịn sò
+  if (slides.length > 0) {
+    const totalSlides = slides.length;
+    const activeText = slides[currentSlide] || "";
+
+    return (
+      <div
+        ref={playerRef}
+        className="lesson-player bg-[#2d2538] text-white rounded-[13px] overflow-hidden aspect-video flex flex-col justify-between p-6 sm:p-8 shadow-sm relative select-none border border-[#483d56]"
+      >
+        {/* Slide Header */}
+        <div className="flex items-center justify-between text-xs border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="bg-[#71548e] text-white text-[10px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider">
+              SLIDE
+            </span>
+            <span className="text-white/70 font-medium truncate max-w-[280px] sm:max-w-md">
+              {lessonTitle}
+            </span>
+          </div>
+          <span className="text-white/60 font-mono text-xs">
+            {currentSlide + 1} / {totalSlides}
+          </span>
+        </div>
+
+        {/* Slide Main Content */}
+        <div className="flex-1 flex items-center justify-center my-4 overflow-y-auto px-2">
+          <div className="max-w-xl text-center">
+            <p className="text-base sm:text-lg min-[1500px]:text-xl text-[#f3edfa] leading-relaxed whitespace-pre-line m-0">
+              {activeText}
+            </p>
+          </div>
+        </div>
+
+        {/* Slide Navigation Footer */}
+        <div className="flex items-center justify-between pt-3 border-t border-white/10">
+          <button
+            type="button"
+            disabled={currentSlide === 0}
+            onClick={() => setCurrentSlide((prev) => Math.max(0, prev - 1))}
+            className="flex items-center gap-1 text-xs text-white/80 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors px-3 py-1.5 rounded-md hover:bg-white/10 cursor-pointer border-0 bg-transparent"
+          >
+            <Icon name="ChevronLeft" size={16} />
+            <span className="hidden sm:inline">Trang trước</span>
+          </button>
+
+          {/* Dots Indicator */}
+          <div className="flex items-center gap-1.5">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`Slide ${i + 1}`}
+                onClick={() => setCurrentSlide(i)}
+                className={`h-1.5 rounded-full transition-all cursor-pointer border-0 p-0 ${
+                  currentSlide === i
+                    ? "w-5 bg-[#c8b3dc]"
+                    : "w-1.5 bg-white/20 hover:bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            disabled={currentSlide === totalSlides - 1}
+            onClick={() =>
+              setCurrentSlide((prev) => Math.min(totalSlides - 1, prev + 1))
+            }
+            className="flex items-center gap-1 text-xs text-white/80 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors px-3 py-1.5 rounded-md hover:bg-white/10 cursor-pointer border-0 bg-transparent"
+          >
+            <span className="hidden sm:inline">Trang tiếp</span>
+            <Icon name="ChevronRight" size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Nếu không có cả video lẫn slide: Hiển thị giao diện "Chưa có dữ liệu" sạch đẹp
+  return (
+    <div className="lesson-player bg-[#faf8fc] border border-[#e8dfef] rounded-[13px] overflow-hidden aspect-video flex items-center justify-center p-6 shadow-sm">
+      <Empty
+        title="Chưa có học liệu cho bài học này"
+        description={`Bài học "${lessonTitle}" hiện chưa được tải lên video hoặc nội dung slide.`}
+      />
     </div>
   );
 }

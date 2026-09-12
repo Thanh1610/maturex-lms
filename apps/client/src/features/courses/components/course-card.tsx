@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { Button, Card, Icon, Progress, toast } from "@maturex/ui";
+import Link from "next/link";
 import { APP_ROUTES } from "@/lib/api-routes";
-import type { ClientCourseListItem } from "../services/course-service";
 import type { Course } from "../mock-courses";
+import type { ClientCourseListItem } from "../services/course-service";
 
 type CourseCardData = ClientCourseListItem | Course;
 
@@ -66,9 +66,12 @@ export function CourseCard({
           e.preventDefault();
           e.stopPropagation();
           onToggleBookmark?.();
-          toast.success(isSaved ? "Đã bỏ lưu khóa học" : "Đã lưu khóa học vào danh sách", {
-            description: course.title,
-          });
+          toast.success(
+            isSaved ? "Đã bỏ lưu khóa học" : "Đã lưu khóa học vào danh sách",
+            {
+              description: course.title,
+            },
+          );
         }}
       >
         <Icon name="Bookmark" size={17} />
@@ -107,7 +110,9 @@ export function CourseCard({
             <Progress value={course.progress} className="h-1.5" />
             <div className="between flex items-center justify-between gap-[14px] text-xs mt-2">
               <span className="text-[#595364] font-medium">
-                {course.progress === 100 ? "Đã hoàn thành" : `${course.progress}% hoàn thành`}
+                {course.progress === 100
+                  ? "Đã hoàn thành"
+                  : `${course.progress}% hoàn thành`}
               </span>
               <Link
                 href={courseUrl}

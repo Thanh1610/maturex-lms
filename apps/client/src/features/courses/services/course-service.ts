@@ -1,5 +1,5 @@
-import { cache } from "react";
 import { prisma } from "@maturex/database";
+import { cache } from "react";
 
 export interface ClientCourseListItem {
   id: string;
@@ -25,6 +25,7 @@ export interface ClientLessonItem {
   title: string;
   content: string;
   videoUrl?: string | null;
+  slideUrl?: string | null;
 }
 
 export interface ClientCourseDetail extends ClientCourseListItem {
@@ -95,6 +96,7 @@ export const getPublishedCourseById = cache(
               title: true,
               content: true,
               videoUrl: true,
+              slideUrl: true,
             },
           },
           _count: {
@@ -126,5 +128,5 @@ export const getPublishedCourseById = cache(
       console.error("[getPublishedCourseById] Error:", error);
       return null;
     }
-  }
+  },
 );

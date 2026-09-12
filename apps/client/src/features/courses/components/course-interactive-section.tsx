@@ -1,7 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Button,
   Empty,
@@ -16,15 +14,28 @@ import {
   TabsList,
   TabsTrigger,
 } from "@maturex/ui";
-import { CourseCard } from "./course-card";
-import type { ClientCourseListItem } from "../services/course-service";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { findFromSlug, slugify } from "@/lib/slug-helper";
+import type { ClientCourseListItem } from "../services/course-service";
+import { CourseCard } from "./course-card";
 
 interface CourseInteractiveSectionProps {
   initialCourses?: ClientCourseListItem[];
 }
 
-const LEVEL_OPTIONS = ["Tất cả cấp độ", "Nền tảng", "Ứng dụng", "Nâng cao"] as const;
+const LEVEL_OPTIONS = [
+  "Tất cả cấp độ",
+  "Nền tảng",
+  "Ứng dụng",
+  "Nâng cao",
+] as const;
 
 export function CourseInteractiveSection({
   initialCourses = [],
@@ -47,13 +58,13 @@ export function CourseInteractiveSection({
   const categoryParam = searchParams.get("category");
   const categoryFromUrl = useMemo(
     () => findFromSlug(categoryParam, dynamicCategories, "Tất cả"),
-    [categoryParam, dynamicCategories]
+    [categoryParam, dynamicCategories],
   );
 
   const levelParam = searchParams.get("level");
   const levelFromUrl = useMemo(
     () => findFromSlug(levelParam, LEVEL_OPTIONS, "Tất cả cấp độ"),
-    [levelParam]
+    [levelParam],
   );
 
   const searchFromUrl = searchParams.get("q") || "";
@@ -113,7 +124,7 @@ export function CourseInteractiveSection({
         router.replace(targetUrl, { scroll: false });
       });
     },
-    [searchParams, pathname, router]
+    [searchParams, pathname, router],
   );
 
   // Handle category change
@@ -159,7 +170,7 @@ export function CourseInteractiveSection({
 
   const toggleBookmark = (id: string) => {
     setSavedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -215,11 +226,17 @@ export function CourseInteractiveSection({
             <SelectValue placeholder="Chọn cấp độ" />
           </SelectTrigger>
           <SelectContent align="end">
-            {["Tất cả cấp độ", "Nền tảng", "Ứng dụng", "Nâng cao"].map((lvl) => (
-              <SelectItem key={lvl} value={lvl} className="text-xs cursor-pointer">
-                {lvl}
-              </SelectItem>
-            ))}
+            {["Tất cả cấp độ", "Nền tảng", "Ứng dụng", "Nâng cao"].map(
+              (lvl) => (
+                <SelectItem
+                  key={lvl}
+                  value={lvl}
+                  className="text-xs cursor-pointer"
+                >
+                  {lvl}
+                </SelectItem>
+              ),
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -254,7 +271,11 @@ export function CourseInteractiveSection({
               setActiveCategory("Tất cả");
               setLevelFilter("Tất cả cấp độ");
               setSearchQuery("");
-              updateUrlParams({ category: "Tất cả", level: "Tất cả cấp độ", q: "" });
+              updateUrlParams({
+                category: "Tất cả",
+                level: "Tất cả cấp độ",
+                q: "",
+              });
             }}
           >
             Đặt lại bộ lọc

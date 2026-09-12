@@ -1,10 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { prisma } from "@maturex/database";
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { verifyAccessToken } from "@/features/auth/services/jwt-service";
-import { courseFormSchema, type CourseFormValues } from "../schemas/course-form-schema";
+import {
+  type CourseFormValues,
+  courseFormSchema,
+} from "../schemas/course-form-schema";
 import { createCourse } from "../services/course-service";
 
 const ACCESS_COOKIE_NAME = "mx_access_token";
@@ -16,13 +19,14 @@ export interface ActionResult<T = unknown> {
 }
 
 export async function createCourseAction(
-  values: CourseFormValues
+  values: CourseFormValues,
 ): Promise<ActionResult<{ id: string; title: string }>> {
   try {
     // 1. Validate form values with Zod
     const validated = courseFormSchema.safeParse(values);
     if (!validated.success) {
-      const firstError = validated.error.issues[0]?.message || "Dữ liệu không hợp lệ";
+      const firstError =
+        validated.error.issues[0]?.message || "Dữ liệu không hợp lệ";
       return { success: false, error: firstError };
     }
 
@@ -75,14 +79,15 @@ export async function createCourseAction(
       },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra khi tạo khóa học";
+    const message =
+      err instanceof Error ? err.message : "Đã có lỗi xảy ra khi tạo khóa học";
     return { success: false, error: message };
   }
 }
 
 export async function updateCourseAction(
   id: string,
-  values: CourseFormValues
+  values: CourseFormValues,
 ): Promise<ActionResult<{ id: string; title: string }>> {
   try {
     if (!id) {
@@ -92,7 +97,8 @@ export async function updateCourseAction(
     // 1. Validate form values with Zod
     const validated = courseFormSchema.safeParse(values);
     if (!validated.success) {
-      const firstError = validated.error.issues[0]?.message || "Dữ liệu không hợp lệ";
+      const firstError =
+        validated.error.issues[0]?.message || "Dữ liệu không hợp lệ";
       return { success: false, error: firstError };
     }
 
@@ -113,13 +119,16 @@ export async function updateCourseAction(
       },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra khi cập nhật khóa học";
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Đã có lỗi xảy ra khi cập nhật khóa học";
     return { success: false, error: message };
   }
 }
 
 export async function deleteCourseAction(
-  id: string
+  id: string,
 ): Promise<ActionResult<{ id: string }>> {
   try {
     if (!id) {
@@ -132,13 +141,14 @@ export async function deleteCourseAction(
     revalidatePath("/courses");
     return { success: true, data: { id } };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra khi xóa khóa học";
+    const message =
+      err instanceof Error ? err.message : "Đã có lỗi xảy ra khi xóa khóa học";
     return { success: false, error: message };
   }
 }
 
 export async function deleteBulkCoursesAction(
-  ids: string[]
+  ids: string[],
 ): Promise<ActionResult<{ count: number }>> {
   try {
     if (!ids || ids.length === 0) {
@@ -151,18 +161,24 @@ export async function deleteBulkCoursesAction(
     revalidatePath("/courses");
     return { success: true, data: { count: result.count } };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra khi xóa danh sách khóa học";
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Đã có lỗi xảy ra khi xóa danh sách khóa học";
     return { success: false, error: message };
   }
 }
 
 export async function toggleCourseStatusAction(
   id: string,
-  nextStatus: "draft" | "published" | "archived"
+  nextStatus: "draft" | "published" | "archived",
 ): Promise<ActionResult<{ id: string; status: string }>> {
   try {
     if (!id || !nextStatus) {
-      return { success: false, error: "Thiếu thông tin khóa học hoặc trạng thái" };
+      return {
+        success: false,
+        error: "Thiếu thông tin khóa học hoặc trạng thái",
+      };
     }
 
     const { updateCourseStatus } = await import("../services/course-service");
@@ -177,7 +193,10 @@ export async function toggleCourseStatusAction(
       },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra khi cập nhật trạng thái";
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Đã có lỗi xảy ra khi cập nhật trạng thái";
     return { success: false, error: message };
   }
 }

@@ -106,6 +106,7 @@ model Lesson {
   title     String   @db.VarChar(180)
   content   String   @default("") @db.Text
   videoUrl  String?  @map("video_url") @db.VarChar(500)
+  slideUrl  String?  @map("slide_url") @db.VarChar(500)
   createdAt DateTime @default(now()) @map("created_at")
 
   progress  LessonProgress[]

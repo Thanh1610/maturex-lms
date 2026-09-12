@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Badge,
   Button,
@@ -15,14 +13,20 @@ import {
   SimpleTooltip,
   toast,
 } from "@maturex/ui";
-import { APP_ROUTES } from "@/lib/api-routes";
-import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
-import type { CourseListItem } from "../services/course-service";
+import Link from "next/link";
+import { useCallback, useMemo, useState } from "react";
 import {
-  deleteCourseAction,
+  DataTable,
+  type DataTableColumn,
+  type DataTableFilter,
+} from "@/components/ui/data-table";
+import { APP_ROUTES } from "@/lib/api-routes";
+import {
   deleteBulkCoursesAction,
+  deleteCourseAction,
   toggleCourseStatusAction,
 } from "../actions/course-actions";
+import type { CourseListItem } from "../services/course-service";
 
 interface CourseTableProps {
   initialCourses?: CourseListItem[];
@@ -35,7 +39,9 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [courseToDelete, setCourseToDelete] = useState<CourseListItem | null>(null);
+  const [courseToDelete, setCourseToDelete] = useState<CourseListItem | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Danh sách categories động theo dữ liệu
@@ -56,14 +62,13 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
         c.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchCategory =
         categoryFilter === "all" || c.category === categoryFilter;
-      const matchStatus =
-        statusFilter === "all" || c.status === statusFilter;
+      const matchStatus = statusFilter === "all" || c.status === statusFilter;
       return matchSearch && matchCategory && matchStatus;
     });
   }, [courses, searchTerm, categoryFilter, statusFilter]);
 
   // Đổi trạng thái hiển thị
-  const handleToggleStatus = async (course: CourseListItem) => {
+  const handleToggleStatus = useCallback(async (course: CourseListItem) => {
     const nextStatus: "published" | "draft" =
       course.status === "published" ? "draft" : "published";
 
@@ -76,11 +81,13 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
       }
 
       setCourses((prev) =>
-        prev.map((c) => (c.id === course.id ? { ...c, status: nextStatus } : c))
+        prev.map((c) =>
+          c.id === course.id ? { ...c, status: nextStatus } : c,
+        ),
       );
       toast.success(
         `Đã đổi trạng thái sang ${nextStatus === "published" ? "Công khai" : "Bản nháp"}`,
-        { description: course.title }
+        { description: course.title },
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Cập nhật thất bại";
@@ -88,7 +95,7 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
     } finally {
       setUpdatingId(null);
     }
-  };
+  }, []);
 
   // Xóa 1 khóa học
   const confirmDeleteSingle = async () => {
@@ -103,7 +110,9 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
 
       setCourses((prev) => prev.filter((c) => c.id !== courseToDelete.id));
       setSelectedIds((prev) => prev.filter((id) => id !== courseToDelete.id));
-      toast.success("Đã xóa khóa học thành công", { description: courseToDelete.title });
+      toast.success("Đã xóa khóa học thành công", {
+        description: courseToDelete.title,
+      });
       setCourseToDelete(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Đã có lỗi xảy ra";
@@ -154,7 +163,7 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
         ],
       },
     ],
-    [categoryFilter, statusFilter, categories]
+    [categoryFilter, statusFilter, categories],
   );
 
   // Định nghĩa các cột hiển thị
@@ -169,7 +178,9 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
               <Icon name={c.icon || "BookOpen"} size={15} />
             </div>
             <div>
-              <span className="font-medium text-[#392e47] block">{c.title}</span>
+              <span className="font-medium text-[#392e47] block">
+                {c.title}
+              </span>
               <span className="text-[10px] text-[#9386a3]">ID: {c.id}</span>
             </div>
           </div>
@@ -179,7 +190,10 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
         key: "category",
         header: "Danh mục",
         cell: (c) => (
-          <Badge variant="lavender" className="text-[10px] px-2 py-0.5 font-medium">
+          <Badge
+            variant="lavender"
+            className="text-[10px] px-2 py-0.5 font-medium"
+          >
             {c.category}
           </Badge>
         ),
@@ -192,7 +206,11 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
       {
         key: "teacher",
         header: "Giảng viên",
-        cell: (c) => <span className="text-xs text-[#524462] font-medium">{c.teacher}</span>,
+        cell: (c) => (
+          <span className="text-xs text-[#524462] font-medium">
+            {c.teacher}
+          </span>
+        ),
       },
       {
         key: "lessons",
@@ -226,8 +244,8 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
             {updatingId === c.id
               ? "Đang lưu..."
               : c.status === "published"
-              ? "Công khai"
-              : "Bản nháp"}
+                ? "Công khai"
+                : "Bản nháp"}
           </Badge>
         ),
       },
@@ -267,7 +285,7 @@ export function CourseTable({ initialCourses = [] }: CourseTableProps) {
         ),
       },
     ],
-    [updatingId]
+    [updatingId, handleToggleStatus],
   );
 
   return (

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button, Card, Icon, SimpleTooltip } from "@maturex/ui";
+import { useState } from "react";
 import { parseVideoUrl } from "@/lib/video-url-helper";
 import type { LessonItem } from "../services/lesson-service";
 
@@ -77,57 +77,65 @@ export function SortableLessonItem({
                 onClick={() => onPreviewVideo(lesson)}
                 className="relative w-28 h-16 sm:w-32 sm:h-18 rounded-lg overflow-hidden bg-[#1f172b] border border-[#e1d9ea] shrink-0 cursor-pointer group/thumb hover:ring-2 hover:ring-[#71548e] shadow-sm transition-all"
               >
-              {parsed.type === "drive" ? (
-                // Google Drive: Dùng thumbnail ảnh của Drive
-                !imgError && parsed.thumbnailUrl ? (
+                {parsed.type === "drive" ? (
+                  // Google Drive: Dùng thumbnail ảnh của Drive
+                  !imgError && parsed.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={parsed.thumbnailUrl}
+                      alt={lesson.title}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      onError={(e) => {
+                        console.warn(
+                          "[Drive Thumbnail Error]:",
+                          parsed.thumbnailUrl,
+                          e,
+                        );
+                        setImgError(true);
+                      }}
+                      className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#4285F4]/10 text-[#4285F4]">
+                      <Icon name="Video" size={20} />
+                    </div>
+                  )
+                ) : parsed.type === "direct" ? (
+                  // Cloudflare R2 / Direct Video: Render 1 frame đầu tiên làm thumbnail
+                  <video
+                    src={parsed.thumbnailUrl || parsed.embedUrl}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover pointer-events-none group-hover/thumb:scale-105 transition-transform duration-300"
+                  />
+                ) : parsed.thumbnailUrl && !imgError ? (
+                  // YouTube / Other
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={parsed.thumbnailUrl}
                     alt={lesson.title}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.warn("[Drive Thumbnail Error]:", parsed.thumbnailUrl, e);
-                      setImgError(true);
-                    }}
+                    onError={() => setImgError(true)}
                     className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-[#4285F4]/10 text-[#4285F4]">
+                  <div className="w-full h-full flex items-center justify-center bg-[#71548e]/10 text-[#71548e]">
                     <Icon name="Video" size={20} />
                   </div>
-                )
-              ) : parsed.type === "direct" ? (
-                // Cloudflare R2 / Direct Video: Render 1 frame đầu tiên làm thumbnail
-                <video
-                  src={parsed.thumbnailUrl || parsed.embedUrl}
-                  preload="metadata"
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover pointer-events-none group-hover/thumb:scale-105 transition-transform duration-300"
-                />
-              ) : parsed.thumbnailUrl && !imgError ? (
-                // YouTube / Other
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={parsed.thumbnailUrl}
-                  alt={lesson.title}
-                  onError={() => setImgError(true)}
-                  className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-[#71548e]/10 text-[#71548e]">
-                  <Icon name="Video" size={20} />
-                </div>
-              )}
+                )}
 
-              {/* Overlay Play Icon mờ đè lên thumbnail */}
-              <div className="absolute inset-0 bg-black/30 group-hover/thumb:bg-black/15 flex items-center justify-center transition-colors">
-                <div className="w-7 h-7 rounded-full bg-black/65 group-hover/thumb:bg-[#71548e] text-white flex items-center justify-center shadow transition-all">
-                  <Icon name="Play" size={13} className="fill-current ml-0.5" />
+                {/* Overlay Play Icon mờ đè lên thumbnail */}
+                <div className="absolute inset-0 bg-black/30 group-hover/thumb:bg-black/15 flex items-center justify-center transition-colors">
+                  <div className="w-7 h-7 rounded-full bg-black/65 group-hover/thumb:bg-[#71548e] text-white flex items-center justify-center shadow transition-all">
+                    <Icon
+                      name="Play"
+                      size={13}
+                      className="fill-current ml-0.5"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
             </SimpleTooltip>
           )}
 

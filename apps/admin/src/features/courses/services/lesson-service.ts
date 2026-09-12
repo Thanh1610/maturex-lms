@@ -1,4 +1,4 @@
-import { prisma, Prisma } from "@maturex/database";
+import { Prisma, prisma } from "@maturex/database";
 import { deleteR2File } from "@/lib/r2";
 
 export interface LessonItem {
@@ -8,6 +8,7 @@ export interface LessonItem {
   title: string;
   content: string;
   videoUrl?: string | null;
+  slideUrl?: string | null;
   createdAt: Date;
 }
 
@@ -16,6 +17,7 @@ export interface CreateLessonInput {
   title: string;
   content?: string;
   videoUrl?: string | null;
+  slideUrl?: string | null;
   position?: number;
 }
 
@@ -25,12 +27,15 @@ export interface UpdateLessonInput {
   title: string;
   content?: string;
   videoUrl?: string | null;
+  slideUrl?: string | null;
 }
 
 /**
  * Lấy danh sách các bài học thuộc một khóa học, sắp xếp theo position tăng dần
  */
-export async function getLessonsByCourseId(courseId: string): Promise<LessonItem[]> {
+export async function getLessonsByCourseId(
+  courseId: string,
+): Promise<LessonItem[]> {
   const lessons = await prisma.lesson.findMany({
     where: { courseId },
     orderBy: { position: "asc" },
@@ -42,7 +47,9 @@ export async function getLessonsByCourseId(courseId: string): Promise<LessonItem
 /**
  * Tạo một bài học mới cho khóa học, tự động tính position nếu chưa truyền
  */
-export async function createLesson(data: CreateLessonInput): Promise<LessonItem> {
+export async function createLesson(
+  data: CreateLessonInput,
+): Promise<LessonItem> {
   let position = data.position;
 
   if (position === undefined) {
@@ -60,28 +67,38 @@ export async function createLesson(data: CreateLessonInput): Promise<LessonItem>
       title: data.title.trim(),
       content: data.content?.trim() || "",
       videoUrl: data.videoUrl?.trim() || null,
+      slideUrl: data.slideUrl?.trim() || null,
       position,
     },
   });
 }
 
 /**
- * Cập nhật thông tin bài học (title, content, videoUrl).
- * Tự động dọn dẹp video cũ trên R2 nếu người dùng thay thế bằng video mới hoặc xóa video.
+ * Cập nhật thông tin bài học (title, content, videoUrl, slideUrl).
+ * Tự động dọn dẹp video hoặc slide cũ trên R2 nếu người dùng thay thế hoặc xóa.
  */
-export async function updateLesson(data: UpdateLessonInput): Promise<LessonItem> {
+export async function updateLesson(
+  data: UpdateLessonInput,
+): Promise<LessonItem> {
   const existing = await prisma.lesson.findUnique({
     where: { id: data.id },
-    select: { videoUrl: true },
+    select: { videoUrl: true, slideUrl: true },
   });
 
   const nextVideoUrl = data.videoUrl?.trim() || null;
+  const nextSlideUrl = data.slideUrl?.trim() || null;
 
   // Nếu bài học từng có video R2 cũ và bị đổi/xóa => dọn dẹp file cũ trên R2
   if (existing?.videoUrl && existing.videoUrl !== nextVideoUrl) {
-    // Không chặn luồng chính nếu xoá R2 thất bại
     deleteR2File(existing.videoUrl).catch((err) =>
-      console.error("[updateLesson] Failed to cleanup old R2 file:", err)
+      console.error("[updateLesson] Failed to cleanup old R2 video:", err),
+    );
+  }
+
+  // Nếu bài học từng có slide R2 cũ và bị đổi/xóa => dọn dẹp file cũ trên R2
+  if (existing?.slideUrl && existing.slideUrl !== nextSlideUrl) {
+    deleteR2File(existing.slideUrl).catch((err) =>
+      console.error("[updateLesson] Failed to cleanup old R2 slide:", err),
     );
   }
 
@@ -91,23 +108,33 @@ export async function updateLesson(data: UpdateLessonInput): Promise<LessonItem>
       title: data.title.trim(),
       content: data.content?.trim() || "",
       videoUrl: nextVideoUrl,
+      slideUrl: nextSlideUrl,
     },
   });
 }
 
 /**
  * Xóa một bài học và cập nhật lại thứ tự position của các bài học còn lại.
- * Tự động xóa file video trên R2 nếu có.
+ * Tự động xóa file video và slide trên R2 nếu có.
  */
-export async function deleteLesson(id: string, courseId: string): Promise<void> {
+export async function deleteLesson(
+  id: string,
+  courseId: string,
+): Promise<void> {
   const existing = await prisma.lesson.findUnique({
     where: { id },
-    select: { videoUrl: true },
+    select: { videoUrl: true, slideUrl: true },
   });
 
   if (existing?.videoUrl) {
     deleteR2File(existing.videoUrl).catch((err) =>
-      console.error("[deleteLesson] Failed to cleanup R2 video:", err)
+      console.error("[deleteLesson] Failed to cleanup R2 video:", err),
+    );
+  }
+
+  if (existing?.slideUrl) {
+    deleteR2File(existing.slideUrl).catch((err) =>
+      console.error("[deleteLesson] Failed to cleanup R2 slide:", err),
     );
   }
 
@@ -136,12 +163,15 @@ export async function deleteLesson(id: string, courseId: string): Promise<void> 
 /**
  * Cập nhật thứ tự các bài học theo mảng ID truyền vào bằng 1 câu lệnh SQL duy nhất
  */
-export async function reorderLessons(courseId: string, orderedIds: string[]): Promise<void> {
+export async function reorderLessons(
+  courseId: string,
+  orderedIds: string[],
+): Promise<void> {
   if (!orderedIds.length) return;
 
   // Xây dựng danh sách cặp giá trị (id::uuid, new_position)
   const values = orderedIds.map(
-    (id, index) => Prisma.sql`(${id}::uuid, ${index + 1}::int)`
+    (id, index) => Prisma.sql`(${id}::uuid, ${index + 1}::int)`,
   );
 
   // Thực thi duy nhất 1 câu query raw, Postgres tự động map và cập nhật toàn bộ bài học

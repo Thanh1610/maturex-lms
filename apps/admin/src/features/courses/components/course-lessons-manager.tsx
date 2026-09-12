@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import {
-  DndContext,
   closestCenter,
+  DndContext,
+  type DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -16,14 +15,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Button, Card, Icon, toast } from "@maturex/ui";
-import type { LessonItem } from "../services/lesson-service";
+import { Button, Card, ConfirmDialog, Icon, toast } from "@maturex/ui";
+import { useEffect, useState } from "react";
 import {
   createLessonAction,
-  updateLessonAction,
   deleteLessonAction,
   reorderLessonsAction,
+  updateLessonAction,
 } from "../actions/lesson-actions";
+import type { LessonItem } from "../services/lesson-service";
 import { LessonDialog } from "./lesson-dialog";
 import { SortableLessonItem } from "./sortable-lesson-item";
 import { VideoPreviewModal } from "./video-preview-modal";
@@ -42,7 +42,16 @@ export function CourseLessonsManager({
   const [selectedLesson, setSelectedLesson] = useState<LessonItem | null>(null);
   const [previewLesson, setPreviewLesson] = useState<LessonItem | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Cấu hình Sensor cho Drag & Drop (PointerSensor + KeyboardSensor)
   const sensors = useSensors(
@@ -53,7 +62,7 @@ export function CourseLessonsManager({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   // Mở Dialog thêm mới
@@ -73,6 +82,7 @@ export function CourseLessonsManager({
     title: string;
     content: string;
     videoUrl?: string | null;
+    slideUrl?: string | null;
   }) => {
     if (selectedLesson) {
       // Update
@@ -82,11 +92,15 @@ export function CourseLessonsManager({
         title: data.title,
         content: data.content,
         videoUrl: data.videoUrl,
+        slideUrl: data.slideUrl,
       });
 
       if (res.success && res.data) {
+        const updatedLesson = res.data;
         setLessons((prev) =>
-          prev.map((item) => (item.id === selectedLesson.id ? res.data! : item))
+          prev.map((item) =>
+            item.id === selectedLesson.id ? updatedLesson : item,
+          ),
         );
         toast.success("Đã cập nhật bài học", { description: data.title });
       } else {
@@ -100,10 +114,12 @@ export function CourseLessonsManager({
         title: data.title,
         content: data.content,
         videoUrl: data.videoUrl,
+        slideUrl: data.slideUrl,
       });
 
       if (res.success && res.data) {
-        setLessons((prev) => [...prev, res.data!]);
+        const newLesson = res.data;
+        setLessons((prev) => [...prev, newLesson]);
         toast.success("Đã thêm bài học mới", { description: data.title });
       } else {
         toast.error("Lỗi khi tạo bài học", { description: res.error });
@@ -112,9 +128,15 @@ export function CourseLessonsManager({
     }
   };
 
-  // Xóa bài học
-  const handleDeleteLesson = async (id: string, title: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa bài học "${title}"?`)) return;
+  // Nhấn nút xóa bài học -> Mở Dialog xác nhận
+  const handleDeleteLesson = (id: string, title: string) => {
+    setLessonToDelete({ id, title });
+  };
+
+  // Thực thi xóa bài học sau khi người dùng xác nhận ở Dialog
+  const handleConfirmDelete = async () => {
+    if (!lessonToDelete) return;
+    const { id, title } = lessonToDelete;
 
     try {
       setIsDeletingId(id);
@@ -128,6 +150,7 @@ export function CourseLessonsManager({
           }));
         });
         toast.success("Đã xóa bài học", { description: title });
+        setLessonToDelete(null);
       } else {
         toast.error("Không thể xóa bài học", { description: res.error });
       }
@@ -177,7 +200,8 @@ export function CourseLessonsManager({
             Chương trình đào tạo ({lessons.length} bài học)
           </h3>
           <p className="text-xs text-[#7d708f] mt-1 m-0">
-            Kéo thả icon chấm dọc ở đầu mỗi bài học để sắp xếp lại thứ tự bài giảng.
+            Kéo thả icon chấm dọc ở đầu mỗi bài học để sắp xếp lại thứ tự bài
+            giảng.
           </p>
         </div>
         <Button
@@ -200,7 +224,8 @@ export function CourseLessonsManager({
             Chưa có bài học nào
           </h4>
           <p className="text-xs text-[#8c809d] max-w-sm mb-4">
-            Khóa học này hiện chưa có bài giảng nào. Hãy bấm nút dưới đây để tạo bài học đầu tiên.
+            Khóa học này hiện chưa có bài giảng nào. Hãy bấm nút dưới đây để tạo
+            bài học đầu tiên.
           </p>
           <Button
             type="button"
@@ -211,8 +236,23 @@ export function CourseLessonsManager({
             Thêm bài học ngay
           </Button>
         </Card>
+      ) : !mounted ? (
+        <div className="space-y-2">
+          {lessons.map((lesson, index) => (
+            <SortableLessonItem
+              key={lesson.id}
+              lesson={lesson}
+              index={index}
+              isDeleting={isDeletingId === lesson.id}
+              onEdit={handleOpenEdit}
+              onDelete={handleDeleteLesson}
+              onPreviewVideo={setPreviewLesson}
+            />
+          ))}
+        </div>
       ) : (
         <DndContext
+          id="admin-course-lessons-dnd"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
@@ -254,6 +294,31 @@ export function CourseLessonsManager({
         }}
         title={previewLesson?.title || ""}
         videoUrl={previewLesson?.videoUrl || null}
+      />
+
+      {/* Dialog Xác nhận Xóa bài học (Dùng component dùng chung ConfirmDialog) */}
+      <ConfirmDialog
+        open={Boolean(lessonToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingId) setLessonToDelete(null);
+        }}
+        title="Xác nhận xóa bài học"
+        description={
+          <>
+            Bạn có chắc chắn muốn xóa bài học{" "}
+            <span className="font-semibold text-[#3a2c4e]">
+              &quot;{lessonToDelete?.title}&quot;
+            </span>
+            ? Thao tác này sẽ xóa toàn bộ liên kết video và tài liệu của bài học
+            này và không thể hoàn tác.
+          </>
+        }
+        confirmText="Xóa bài học"
+        cancelText="Hủy bỏ"
+        variant="destructive"
+        isLoading={Boolean(isDeletingId)}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setLessonToDelete(null)}
       />
     </div>
   );

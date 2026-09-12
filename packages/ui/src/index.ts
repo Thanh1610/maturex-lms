@@ -18,6 +18,7 @@ export * from "./components/tabs";
 export * from "./components/select";
 export * from "./components/table";
 export * from "./components/dialog";
+export * from "./components/confirm-dialog";
 export * from "./components/tooltip";
 export * from "./components/sonner";
 export * from "./lib/use-mobile";

@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Icon, toast } from "@maturex/ui";
-import type { Course } from "../mock-courses";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import type { ClientCourseDetail } from "../services/course-service";
-import { topicDetails } from "../mock-courses";
 import { CourseCurriculum } from "./course-curriculum";
 import { CourseDetailHeader } from "./course-detail-header";
 import { CoursePlayer } from "./course-player";
@@ -12,56 +16,79 @@ import { CourseTabsContent } from "./course-tabs-content";
 import { CourseTutor } from "./course-tutor";
 
 interface CourseDetailViewProps {
-  course: ClientCourseDetail | Course;
+  course: ClientCourseDetail;
+  initialLessonParam?: string;
 }
 
-export function CourseDetailView({ course }: CourseDetailViewProps) {
-  const [currentLesson, setCurrentLesson] = useState(0);
-  const [enrolled, setEnrolled] = useState(false);
-  const [completedLessons, setCompletedLessons] = useState<number[]>([]);
+export function CourseDetailView({
+  course,
+  initialLessonParam,
+}: CourseDetailViewProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
 
-  // Đọc nội dung slide từ DB lesson nếu có, fallback về topicDetails hoặc mặc định
-  const detailCourse = "lessonsList" in course ? (course as ClientCourseDetail) : null;
-  const currentLessonData = detailCourse?.lessonsList?.[currentLesson];
-  const currentLessonContent = currentLessonData?.content;
-  const currentLessonVideo = currentLessonData?.videoUrl;
-
-  const slides = currentLessonContent
-    ? currentLessonContent
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : topicDetails[course.id] ||
-      topicDetails.ai || [
-        course.title,
-        "Nêu bối cảnh, mục tiêu và yêu cầu cốt lõi.",
-        "Đối chiếu tài liệu và tiến hành thực hành.",
-        "Tự kiểm tra kết quả và tổng kết bài học.",
-      ];
-
-  const isCurrentLessonDone = completedLessons.includes(currentLesson);
-
-  const handleToggleLessonStatus = () => {
-    if (!enrolled) {
-      setEnrolled(true);
-      toast.success("Đã ghi danh khóa học", {
-        description: `Bắt đầu học: "${course.title}"`,
-      });
-      return;
+  const lessons = useMemo(() => {
+    if (course.lessonsList && course.lessonsList.length > 0) {
+      return course.lessonsList;
     }
+    // Fallback nếu course chỉ có mảng string titles
+    return course.lessons.map((title, idx) => ({
+      id: `lesson-${idx}`,
+      position: idx + 1,
+      title,
+      content: "",
+      videoUrl: null,
+      slideUrl: null,
+    }));
+  }, [course]);
 
-    if (isCurrentLessonDone) {
-      setCompletedLessons((prev) => prev.filter((idx) => idx !== currentLesson));
-      toast.info("Đã hủy đánh dấu hoàn thành bài học", {
-        description: course.lessons[currentLesson],
-      });
-    } else {
-      setCompletedLessons((prev) => [...prev, currentLesson]);
-      toast.success("Đã hoàn thành bài học!", {
-        description: course.lessons[currentLesson],
-      });
+  // Đọc lesson index từ URL param (?lesson=1 -> index 0)
+  const lessonParam = searchParams.get("lesson") || initialLessonParam;
+  const initialLessonIndex = useMemo(() => {
+    if (!lessonParam) return 0;
+    const parsed = parseInt(lessonParam, 10);
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= lessons.length) {
+      return parsed - 1;
     }
-  };
+    // Hỗ trợ tìm theo lesson ID nếu param là id
+    const foundById = lessons.findIndex((l) => l.id === lessonParam);
+    return foundById !== -1 ? foundById : 0;
+  }, [lessonParam, lessons]);
+
+  const [currentLesson, setCurrentLesson] =
+    useState<number>(initialLessonIndex);
+
+  // Sync state khi người dùng back/forward trình duyệt
+  useEffect(() => {
+    setCurrentLesson(initialLessonIndex);
+  }, [initialLessonIndex]);
+
+  const handleSelectLesson = useCallback(
+    (index: number) => {
+      setCurrentLesson(index);
+      const params = new URLSearchParams(searchParams.toString());
+      if (index === 0) {
+        params.delete("lesson");
+      } else {
+        params.set("lesson", String(index + 1));
+      }
+      const queryString = params.toString();
+      const targetUrl = queryString ? `${pathname}?${queryString}` : pathname;
+
+      startTransition(() => {
+        router.replace(targetUrl, { scroll: false });
+      });
+    },
+    [searchParams, pathname, router],
+  );
+
+  const currentLessonData = lessons[currentLesson] || lessons[0];
+  const lessonTitle = currentLessonData?.title || "Bài học giới thiệu";
+  const lessonContent = currentLessonData?.content || "";
+  const lessonVideoUrl = currentLessonData?.videoUrl;
+  const lessonSlideUrl = currentLessonData?.slideUrl;
 
   return (
     <div className="course-detail-container pb-12">
@@ -71,67 +98,48 @@ export function CourseDetailView({ course }: CourseDetailViewProps) {
         {/* Main Column */}
         <div className="main-content min-w-0">
           <CoursePlayer
-            course={course}
-            currentLessonIndex={currentLesson}
-            slides={slides}
-            videoUrl={currentLessonVideo}
+            courseTitle={course.title}
+            lessonTitle={lessonTitle}
+            videoUrl={lessonVideoUrl}
+            slideUrl={lessonSlideUrl}
+            content={lessonContent}
           />
 
-          {/* Lesson Actions Banner */}
+          {/* Lesson Info Banner */}
           <div className="flex items-center justify-between gap-4 my-5 bg-white p-4 rounded-xl border border-[#e9eaf0]">
             <div>
               <span className="text-[10px] font-semibold tracking-wider text-[#8b7e9b] uppercase block mb-1">
                 BẠN ĐANG HỌC
               </span>
               <h3 className="text-sm font-semibold text-[#483959] m-0">
-                {course.lessons[currentLesson] || "Bài học giới thiệu"}
+                {lessonTitle}
               </h3>
             </div>
 
-            <Button
-              variant={isCurrentLessonDone ? "secondary" : "default"}
-              className={`text-xs flex items-center gap-2 rounded-lg font-medium transition-colors ${
-                isCurrentLessonDone
-                  ? "bg-[#e8f4eb] text-[#347847] hover:bg-[#ddedd0]"
-                  : enrolled
-                    ? "bg-[#71548e] text-white hover:bg-[#60447a]"
-                    : "bg-[#71548e] text-white hover:bg-[#60447a]"
-              }`}
-              onClick={handleToggleLessonStatus}
-            >
-              <Icon
-                name={
-                  isCurrentLessonDone
-                    ? "CheckCircle2"
-                    : enrolled
-                      ? "Check"
-                      : "Plus"
-                }
-                size={16}
-              />
-              <span>
-                {isCurrentLessonDone
-                  ? "Đã hoàn thành"
-                  : enrolled
-                    ? "Hoàn thành bài học"
-                    : "Đăng ký học"}
-              </span>
-            </Button>
+            <div className="text-xs text-[#8d829e]">
+              Bài {currentLesson + 1} / {lessons.length}
+            </div>
           </div>
 
-          <CourseTabsContent course={course} slides={slides} />
+          <CourseTabsContent
+            courseDescription={course.description}
+            lessonTitle={lessonTitle}
+            lessonContent={lessonContent}
+          />
         </div>
 
         {/* Sidebar Column */}
         <div className="sidebar-column flex flex-col gap-6">
           <CourseCurriculum
-            course={course}
+            lessons={lessons}
             currentLesson={currentLesson}
-            completedLessons={completedLessons}
-            onSelectLesson={(idx) => setCurrentLesson(idx)}
+            onSelectLesson={handleSelectLesson}
           />
 
-          <CourseTutor course={course} />
+          <CourseTutor
+            courseTitle={course.title}
+            courseDescription={course.description}
+          />
         </div>
       </div>
     </div>

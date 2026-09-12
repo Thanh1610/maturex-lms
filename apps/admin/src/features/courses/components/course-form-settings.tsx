@@ -10,18 +10,18 @@ import {
   SelectValue,
 } from "@maturex/ui";
 import {
-  type CourseFormData,
   COURSE_COLOR_OPTIONS,
   COURSE_ICON_OPTIONS,
   COURSE_LEVEL_OPTIONS,
   COURSE_STATUS_OPTIONS,
+  type CourseFormData,
 } from "../constants/course-constants";
 
 interface CourseFormSettingsProps {
   formData: CourseFormData;
   onUpdateField: <K extends keyof CourseFormData>(
     field: K,
-    value: CourseFormData[K]
+    value: CourseFormData[K],
   ) => void;
 }
 
@@ -66,8 +66,8 @@ export function CourseFormSettings({
             {formData.status === "published"
               ? "Khóa học sẽ hiển thị ngay cho học viên trên hệ thống."
               : formData.status === "draft"
-              ? "Lưu nháp, chỉ admin và tác giả có thể xem."
-              : "Khóa học đã đóng và lưu trữ."}
+                ? "Lưu nháp, chỉ admin và tác giả có thể xem."
+                : "Khóa học đã đóng và lưu trữ."}
           </p>
         </div>
 
@@ -93,7 +93,10 @@ export function CourseFormSettings({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="duration" className="text-xs font-semibold text-[#483c58]">
+          <Label
+            htmlFor="duration"
+            className="text-xs font-semibold text-[#483c58]"
+          >
             Thời lượng ước tính
           </Label>
           <Input

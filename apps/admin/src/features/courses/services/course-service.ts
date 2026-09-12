@@ -116,7 +116,9 @@ export async function getCourseById(id: string) {
   };
 }
 
-export type CourseDetail = NonNullable<Awaited<ReturnType<typeof getCourseById>>>;
+export type CourseDetail = NonNullable<
+  Awaited<ReturnType<typeof getCourseById>>
+>;
 
 export type UpdateCourseInput = CreateCourseInput;
 
@@ -155,7 +157,7 @@ export async function deleteCourses(ids: string[]) {
 
 export async function updateCourseStatus(
   id: string,
-  status: "draft" | "published" | "archived"
+  status: "draft" | "published" | "archived",
 ) {
   return await prisma.course.update({
     where: { id },

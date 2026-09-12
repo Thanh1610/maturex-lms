@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, Icon } from "@maturex/ui";
-import type { Course } from "../mock-courses";
-import { topicDetails } from "../mock-courses";
+import { useEffect, useRef, useState } from "react";
 
 interface CourseTutorProps {
-  course: Course;
+  courseTitle: string;
+  courseDescription: string;
 }
 
 interface ChatMessage {
@@ -14,7 +13,10 @@ interface ChatMessage {
   text: string;
 }
 
-export function CourseTutor({ course }: CourseTutorProps) {
+export function CourseTutor({
+  courseTitle,
+  courseDescription,
+}: CourseTutorProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,16 +37,22 @@ export function CourseTutor({ course }: CourseTutorProps) {
     setBusy(true);
 
     setTimeout(() => {
-      const courseTopics = topicDetails[course.id] || topicDetails.ai;
       let reply = "";
-
       const lower = trimmed.toLowerCase();
-      if (lower.includes("vi du") || lower.includes("ví dụ") || lower.includes("áp dụng")) {
-        reply = `Ví dụ luyện tập: Khi bạn áp dụng nội dung của "${course.title}", hãy xác định rõ câu hỏi cần giải quyết, bằng chứng kiểm chứng và điều kiện dừng trước khi triển khai.`;
-      } else if (lower.includes("kiểm tra") || lower.includes("kiem tra") || lower.includes("hiểu")) {
-        reply = `Cùng thử một câu nhé: Trong “${course.title}”, bạn sẽ dùng bằng chứng nào để biết mình đã áp dụng đúng? Hãy nêu một tình huống thực tế của bạn.`;
+      if (
+        lower.includes("vi du") ||
+        lower.includes("ví dụ") ||
+        lower.includes("áp dụng")
+      ) {
+        reply = `Ví dụ luyện tập: Khi bạn áp dụng nội dung của "${courseTitle}", hãy xác định rõ câu hỏi cần giải quyết, bằng chứng kiểm chứng và điều kiện dừng trước khi triển khai.`;
+      } else if (
+        lower.includes("kiểm tra") ||
+        lower.includes("kiem tra") ||
+        lower.includes("hiểu")
+      ) {
+        reply = `Cùng thử một câu nhé: Trong “${courseTitle}”, bạn sẽ dùng bằng chứng nào để biết mình đã áp dụng đúng? Hãy nêu một tình huống thực tế của bạn.`;
       } else {
-        reply = `Điểm chính trong nội dung này: ${courseTopics[0]} ${courseTopics[1]} Bạn đang vướng ở phần lý thuyết hay thực hành?`;
+        reply = `Điểm chính trong nội dung này: ${courseDescription} Bạn đang vướng ở phần lý thuyết hay bài tập thực hành?`;
       }
 
       setMessages((prev) => [...prev, { role: "ai", text: reply }]);
@@ -66,7 +74,10 @@ export function CourseTutor({ course }: CourseTutorProps) {
             Học sâu hơn, từng câu hỏi
           </span>
         </div>
-        <Badge variant="lavender" className="text-[10px] bg-[#f0e9f7] text-[#71538f] border-0 px-1.5 py-0.5">
+        <Badge
+          variant="lavender"
+          className="text-[10px] bg-[#f0e9f7] text-[#71538f] border-0 px-1.5 py-0.5"
+        >
           AI demo
         </Badge>
       </div>
@@ -81,7 +92,7 @@ export function CourseTutor({ course }: CourseTutorProps) {
               Cùng làm rõ điều bạn đang học.
             </h4>
             <p className="text-[11px] text-[#8e819b] mb-4 leading-relaxed">
-              Mình đang đồng hành cùng bạn trong khóa “{course.title}”.
+              Mình đang đồng hành cùng bạn trong khóa “{courseTitle}”.
             </p>
 
             <div className="space-y-1.5">
@@ -97,7 +108,11 @@ export function CourseTutor({ course }: CourseTutorProps) {
                   onClick={() => handleSend(prompt)}
                 >
                   <span>{prompt}</span>
-                  <Icon name="ArrowUpRight" size={13} className="text-[#a493b8]" />
+                  <Icon
+                    name="ArrowUpRight"
+                    size={13}
+                    className="text-[#a493b8]"
+                  />
                 </button>
               ))}
             </div>

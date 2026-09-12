@@ -1,8 +1,8 @@
-import { Suspense } from "react";
 import { PageHead } from "@maturex/ui";
+import { Suspense } from "react";
+import { getPublishedCourses } from "../services/course-service";
 import { CourseBanner } from "./course-banner";
 import { CourseInteractiveSection } from "./course-interactive-section";
-import { getPublishedCourses } from "../services/course-service";
 
 /**
  * CourseView - Server Component (SSR by default)
@@ -30,4 +30,3 @@ export async function CourseView() {
     </div>
   );
 }
-

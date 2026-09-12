@@ -1,13 +1,13 @@
 "use client";
 
+import { Badge, Button, Icon, toast } from "@maturex/ui";
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Button, Icon, toast } from "@maturex/ui";
 import { APP_ROUTES } from "@/lib/api-routes";
-import type { Course } from "../mock-courses";
+import type { ClientCourseListItem } from "../services/course-service";
 
 interface CourseDetailHeaderProps {
-  course: Course;
+  course: ClientCourseListItem;
 }
 
 export function CourseDetailHeader({ course }: CourseDetailHeaderProps) {
@@ -40,11 +40,14 @@ export function CourseDetailHeader({ course }: CourseDetailHeaderProps) {
       <div className="course-page-heading flex items-start justify-between gap-4 flex-wrap">
         <div className="max-w-[800px]">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="lavender" className="bg-[#f0e9f8] text-[#71548e] hover:bg-[#ebdff6] font-medium border-0">
+            <Badge
+              variant="lavender"
+              className="bg-[#f0e9f8] text-[#71548e] hover:bg-[#ebdff6] font-medium border-0"
+            >
               {course.category}
             </Badge>
             <span className="text-xs text-[#8d829e] font-normal">
-              {course.level} · {course.scope || "MatureX"}
+              {course.level} · {course.label || "MatureX"}
             </span>
           </div>
 
@@ -53,7 +56,9 @@ export function CourseDetailHeader({ course }: CourseDetailHeaderProps) {
           </h1>
 
           <p className="text-xs sm:text-sm text-[#736a82] m-0 flex items-center flex-wrap gap-2">
-            <span>Hướng dẫn bởi <strong>{course.teacher}</strong></span>
+            <span>
+              Hướng dẫn bởi <strong>{course.teacher}</strong>
+            </span>
             <span className="text-[#bbb2c9]">•</span>
             <span>{course.lessons.length} bài học</span>
             <span className="text-[#bbb2c9]">•</span>
@@ -70,7 +75,11 @@ export function CourseDetailHeader({ course }: CourseDetailHeaderProps) {
           }`}
           onClick={handleToggleBookmark}
         >
-          <Icon name="Bookmark" size={16} className={saved ? "fill-[#78599a]" : ""} />
+          <Icon
+            name="Bookmark"
+            size={16}
+            className={saved ? "fill-[#78599a]" : ""}
+          />
           <span>{saved ? "Đã lưu" : "Lưu khóa học"}</span>
         </Button>
       </div>

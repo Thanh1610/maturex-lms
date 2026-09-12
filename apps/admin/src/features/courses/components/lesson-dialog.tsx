@@ -1,26 +1,34 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Button,
+  Icon,
   Input,
   Label,
-  Icon,
 } from "@maturex/ui";
+import { useEffect, useRef, useState } from "react";
+import {
+  getLessonUploadUrlAction,
+  getSlideUploadUrlAction,
+} from "../actions/lesson-actions";
 import type { LessonItem } from "../services/lesson-service";
-import { getLessonUploadUrlAction } from "../actions/lesson-actions";
 
 interface LessonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lesson?: LessonItem | null;
-  onSave: (data: { title: string; content: string; videoUrl?: string | null }) => Promise<void>;
+  onSave: (data: {
+    title: string;
+    content: string;
+    videoUrl?: string | null;
+    slideUrl?: string | null;
+  }) => Promise<void>;
 }
 
 export function LessonDialog({
@@ -32,22 +40,44 @@ export function LessonDialog({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [slideUrl, setSlideUrl] = useState("");
+  const [lessonType, setLessonType] = useState<"video" | "slide">("video");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Upload state
+  // Video Upload state
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Slide Upload state (.pptx, .pdf)
+  const [isUploadingSlide, setIsUploadingSlide] = useState(false);
+  const [uploadSlideProgress, setUploadSlideProgress] = useState(0);
+  const slideFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setTitle(lesson?.title || "");
       setContent(lesson?.content || "");
-      setVideoUrl(lesson?.videoUrl || "");
+      const currentVideo = lesson?.videoUrl || "";
+      const currentSlide = lesson?.slideUrl || "";
+      setVideoUrl(currentVideo);
+      setSlideUrl(currentSlide);
+
+      // Tự động chọn tab: nếu có slide hoặc có content mà không có video -> tab slide
+      if (
+        !currentVideo &&
+        (currentSlide || (lesson?.content || "").trim().length > 0)
+      ) {
+        setLessonType("slide");
+      } else {
+        setLessonType("video");
+      }
       setError(null);
       setIsUploading(false);
       setUploadProgress(0);
+      setIsUploadingSlide(false);
+      setUploadSlideProgress(0);
     }
   }, [open, lesson]);
 
@@ -96,7 +126,11 @@ export function LessonDialog({
         };
 
         xhr.onerror = () => {
-          reject(new Error("Lỗi kết nối mạng khi tải lên. Vui lòng kiểm tra lại đường truyền mạng."));
+          reject(
+            new Error(
+              "Lỗi kết nối mạng khi tải lên. Vui lòng kiểm tra lại đường truyền mạng.",
+            ),
+          );
         };
 
         xhr.send(file);
@@ -106,12 +140,85 @@ export function LessonDialog({
       setVideoUrl(publicUrl);
     } catch (err: unknown) {
       console.error("[handleFileUpload Error]:", err);
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi tải video.";
+      const msg =
+        err instanceof Error ? err.message : "Đã xảy ra lỗi khi tải video.";
       setError(msg);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Xử lý upload trực tiếp file slide (.pptx, .pdf) lên R2 thư mục lessions/slides/
+  const handleSlideUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingSlide(true);
+      setUploadSlideProgress(0);
+      setError(null);
+
+      const res = await getSlideUploadUrlAction({
+        fileName: file.name,
+        contentType:
+          file.type ||
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        fileSize: file.size,
+      });
+
+      if (!res.success || !res.data) {
+        throw new Error(res.error || "Không thể khởi tạo phiên tải lên slide.");
+      }
+
+      const { uploadUrl, publicUrl } = res.data;
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl, true);
+        xhr.setRequestHeader(
+          "Content-Type",
+          file.type || "application/octet-stream",
+        );
+
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable) {
+            const percent = Math.round((evt.loaded / evt.total) * 100);
+            setUploadSlideProgress(percent);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(
+              new Error(`Tải lên slide thất bại với mã HTTP ${xhr.status}`),
+            );
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(
+            new Error("Lỗi kết nối mạng khi tải slide. Vui lòng thử lại."),
+          );
+        };
+
+        xhr.send(file);
+      });
+
+      setSlideUrl(publicUrl);
+    } catch (err: unknown) {
+      console.error("[handleSlideUpload Error]:", err);
+      const msg =
+        err instanceof Error ? err.message : "Đã xảy ra lỗi khi tải slide.";
+      setError(msg);
+    } finally {
+      setIsUploadingSlide(false);
+      if (slideFileInputRef.current) {
+        slideFileInputRef.current.value = "";
       }
     }
   };
@@ -130,6 +237,7 @@ export function LessonDialog({
         title: title.trim(),
         content: content.trim(),
         videoUrl: videoUrl.trim() || null,
+        slideUrl: slideUrl.trim() || null,
       });
       onOpenChange(false);
     } catch (err) {
@@ -178,7 +286,10 @@ export function LessonDialog({
 
             {/* Tiêu đề bài học */}
             <div className="space-y-1.5">
-              <Label htmlFor="lesson-title" className="text-xs font-medium text-[#483959]">
+              <Label
+                htmlFor="lesson-title"
+                className="text-xs font-medium text-[#483959]"
+              >
                 Tiêu đề bài học <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -191,88 +302,275 @@ export function LessonDialog({
               />
             </div>
 
-            {/* Video bài học */}
-            <div className="space-y-2 p-3 bg-[#faf9fc] rounded-lg border border-[#ebe5f2]">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="lesson-video" className="text-xs font-medium text-[#483959] flex items-center gap-1.5">
-                  <Icon name="Video" size={14} className="text-[#71548e]" />
-                  <span>Video bài giảng</span>
-                </Label>
-                {videoUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setVideoUrl("")}
-                    className="text-[11px] text-red-600 hover:underline cursor-pointer border-0 bg-transparent p-0"
-                  >
-                    Xóa video
-                  </button>
-                )}
-              </div>
-
-              {/* Upload Button & File Input */}
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={isUploading || isSubmitting}
-                />
-                <Button
+            {/* Định dạng bài học: Chọn Video hoặc Slide / Tài liệu */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-[#f0eaf7] rounded-lg border border-[#e5dcee]">
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading || isSubmitting}
-                  className="text-xs h-8 flex items-center gap-1.5 bg-white border-[#d8cde6] hover:bg-[#f6f2fa]"
+                  onClick={() => setLessonType("video")}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                    lessonType === "video"
+                      ? "bg-white text-[#674b88] shadow-sm font-semibold"
+                      : "text-[#837699] hover:text-[#674b88] hover:bg-white/50"
+                  }`}
                 >
-                  <Icon name="Upload" size={13} />
-                  <span>{isUploading ? `Đang tải lên (${uploadProgress}%)...` : "Tải video lên"}</span>
-                </Button>
-                <span className="text-[11px] text-[#8e829d]">hoặc dán đường dẫn trực tiếp:</span>
+                  <Icon name="Video" size={14} />
+                  <span>Video bài giảng</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLessonType("slide")}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+                    lessonType === "slide"
+                      ? "bg-white text-[#674b88] shadow-sm font-semibold"
+                      : "text-[#837699] hover:text-[#674b88] hover:bg-white/50"
+                  }`}
+                >
+                  <Icon name="FileText" size={14} />
+                  <span>Slide / Tài liệu</span>
+                </button>
               </div>
 
-              {/* Upload Progress Bar */}
-              {isUploading && (
-                <div className="w-full bg-[#e8e0f0] rounded-full h-1.5 overflow-hidden my-1">
-                  <div
-                    className="bg-[#71548e] h-1.5 rounded-full transition-all duration-200"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
+              {/* Tab 1: Video bài học */}
+              {lessonType === "video" && (
+                <div className="space-y-3">
+                  <div className="space-y-2 p-3.5 bg-[#faf9fc] rounded-lg border border-[#ebe5f2]">
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor="lesson-video"
+                        className="text-xs font-medium text-[#483959] flex items-center gap-1.5"
+                      >
+                        <Icon
+                          name="Video"
+                          size={14}
+                          className="text-[#71548e]"
+                        />
+                        <span>Nguồn video</span>
+                      </Label>
+                      {videoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setVideoUrl("")}
+                          className="text-[11px] text-red-600 hover:underline cursor-pointer border-0 bg-transparent p-0 font-medium"
+                        >
+                          Xóa video
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Upload Button & File Input */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs bg-white border-[#d8cee5] hover:bg-[#f3edf9] text-[#553c70] flex items-center gap-1.5"
+                        disabled={isUploading}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Icon name="Upload" size={13} />
+                        <span>
+                          {isUploading
+                            ? "Đang tải video lên..."
+                            : "Tải lên tệp video"}
+                        </span>
+                      </Button>
+
+                      <span className="text-[11px] text-[#9b8fa9]">
+                        hoặc nhập link video
+                      </span>
+                    </div>
+
+                    {/* Progress Bar khi Upload */}
+                    {isUploading && (
+                      <div className="space-y-1 pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-[#71548e]">
+                          <span>Tiến độ tải lên</span>
+                          <span className="font-semibold">
+                            {uploadProgress}%
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[#e8e2f0] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#71548e] transition-all duration-150 rounded-full"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* URL Input */}
+                    <Input
+                      id="lesson-video"
+                      placeholder="Dán URL video (Cloudflare R2, YouTube, Vimeo, Google Drive...)"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      disabled={isUploading}
+                      className="h-8 text-xs bg-white"
+                    />
+
+                    {videoUrl && (
+                      <p className="text-[10px] text-[#558261] flex items-center gap-1 mt-1 m-0">
+                        <Icon name="CheckCircle2" size={12} />
+                        <span>Đã gắn video cho bài học này</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Mô tả / Ghi chú phụ cho bài video (tùy chọn) */}
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="video-notes"
+                      className="text-xs font-medium text-[#483959]"
+                    >
+                      Mô tả bài học / Tóm tắt đi kèm video (Tùy chọn)
+                    </Label>
+                    <textarea
+                      id="video-notes"
+                      rows={3}
+                      placeholder="Nhập mô tả hoặc tóm tắt các điểm chính của bài học..."
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      className="w-full rounded-md border border-[#e5dced] bg-white px-3 py-2 text-xs text-[#2d223c] placeholder:text-[#9c93a8] focus:outline-none focus:ring-1 focus:ring-[#71548e] transition-colors resize-y leading-relaxed"
+                    />
+                  </div>
                 </div>
               )}
 
-              {/* URL Input */}
-              <Input
-                id="lesson-video"
-                placeholder="Dán đường dẫn video (.mp4, YouTube, Vimeo...)"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                className="h-8 text-xs bg-white"
-              />
+              {/* Tab 2: Slide / Trình chiếu / Tài liệu */}
+              {lessonType === "slide" && (
+                <div className="space-y-3">
+                  {/* Upload File Slide (PowerPoint .pptx hoặc PDF) */}
+                  <div className="space-y-2 p-3.5 bg-[#faf9fc] rounded-lg border border-[#ebe5f2]">
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor="lesson-slide"
+                        className="text-xs font-medium text-[#483959] flex items-center gap-1.5"
+                      >
+                        <Icon
+                          name="FileText"
+                          size={14}
+                          className="text-[#71548e]"
+                        />
+                        <span>Tệp trình chiếu (PowerPoint / PDF)</span>
+                      </Label>
+                      {slideUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setSlideUrl("")}
+                          className="text-[11px] text-red-600 hover:underline cursor-pointer border-0 bg-transparent p-0 font-medium"
+                        >
+                          Xóa tệp slide
+                        </button>
+                      )}
+                    </div>
 
-              {videoUrl && (
-                <p className="text-[10px] text-[#558261] flex items-center gap-1 mt-1 m-0">
-                  <Icon name="CheckCircle2" size={12} />
-                  <span>Đã gắn video cho bài học này</span>
-                </p>
+                    {/* Upload Button & File Input */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        ref={slideFileInputRef}
+                        type="file"
+                        accept=".pptx,.ppt,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        className="hidden"
+                        onChange={handleSlideUpload}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs bg-white border-[#d8cee5] hover:bg-[#f3edf9] text-[#553c70] flex items-center gap-1.5"
+                        disabled={isUploadingSlide}
+                        onClick={() => slideFileInputRef.current?.click()}
+                      >
+                        <Icon name="Upload" size={13} />
+                        <span>
+                          {isUploadingSlide
+                            ? "Đang tải slide lên..."
+                            : "Tải lên tệp .pptx hoặc .pdf"}
+                        </span>
+                      </Button>
+
+                      <span className="text-[11px] text-[#9b8fa9]">
+                        hoặc nhập link slide R2
+                      </span>
+                    </div>
+
+                    {/* Progress Bar khi Upload Slide */}
+                    {isUploadingSlide && (
+                      <div className="space-y-1 pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-[#71548e]">
+                          <span>Tiến độ tải lên</span>
+                          <span className="font-semibold">
+                            {uploadSlideProgress}%
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[#e8e2f0] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#71548e] transition-all duration-150 rounded-full"
+                            style={{ width: `${uploadSlideProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Slide URL Input */}
+                    <Input
+                      id="lesson-slide"
+                      placeholder="Dán URL slide Cloudflare R2 (maturex-lms/lessions/slides/...)"
+                      value={slideUrl}
+                      onChange={(e) => setSlideUrl(e.target.value)}
+                      disabled={isUploadingSlide}
+                      className="h-8 text-xs bg-white"
+                    />
+
+                    {slideUrl && (
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p className="text-[10px] text-[#558261] flex items-center gap-1 m-0">
+                          <Icon name="CheckCircle2" size={12} />
+                          <span>
+                            Đã gắn slide (
+                            {slideUrl.endsWith(".pdf") ? "PDF" : "PowerPoint"})
+                          </span>
+                        </p>
+                        <a
+                          href={slideUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-[#71548e] hover:underline flex items-center gap-1"
+                        >
+                          <span>Mở thử tệp</span>
+                          <Icon name="ExternalLink" size={10} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Soạn thảo mô tả / nội dung kèm theo */}
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="slide-content"
+                      className="text-xs font-medium text-[#483959]"
+                    >
+                      Mô tả bài học / Tóm tắt nội dung slide bài học
+                    </Label>
+                    <textarea
+                      id="slide-content"
+                      rows={5}
+                      placeholder="Nhập mô tả, mục tiêu hoặc tóm tắt bài học đi kèm slide..."
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      className="w-full rounded-md border border-[#e5dced] bg-white px-3 py-2 text-xs text-[#2d223c] placeholder:text-[#9c93a8] focus:outline-none focus:ring-1 focus:ring-[#71548e] transition-colors resize-y leading-relaxed"
+                    />
+                  </div>
+                </div>
               )}
-            </div>
-
-            {/* Nội dung bài học */}
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-content" className="text-xs font-medium text-[#483959]">
-                Nội dung bài giảng / Slide ghi chú (Mỗi dòng là 1 ý slide)
-              </Label>
-              <textarea
-                id="lesson-content"
-                rows={5}
-                placeholder="Nhập nội dung bài học tại đây (hỗ trợ văn bản hoặc các gạch đầu dòng tương ứng với các slide trong trình phát)..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full rounded-md border border-[#e5dced] bg-white px-3 py-2 text-xs text-[#2d223c] placeholder:text-[#9c93a8] focus:outline-none focus:ring-1 focus:ring-[#71548e] transition-colors resize-y leading-relaxed"
-              />
             </div>
           </div>
 
@@ -291,7 +589,11 @@ export function LessonDialog({
               className="bg-[#71548e] hover:bg-[#5f4479] text-white text-xs h-8"
               disabled={isSubmitting || isUploading}
             >
-              {isSubmitting ? "Đang lưu..." : lesson ? "Lưu thay đổi" : "Tạo bài học"}
+              {isSubmitting
+                ? "Đang lưu..."
+                : lesson
+                  ? "Lưu thay đổi"
+                  : "Tạo bài học"}
             </Button>
           </DialogFooter>
         </form>
